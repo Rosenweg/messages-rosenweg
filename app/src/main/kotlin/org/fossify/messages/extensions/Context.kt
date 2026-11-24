@@ -1289,7 +1289,9 @@ fun Context.getFileSizeFromUri(uri: Uri): Long {
 fun Context.clearAllMessagesIfNeeded(callback: () -> Unit) {
     if (!config.wasDbCleared) {
         ensureBackgroundThread {
-            messagesDB.deleteAll()
+            // Rosenweg: der Spiegel der Rosenweg-Chats (negative IDs) bleibt stehen
+            val n = messagesDB.deleteAllExceptRosenweg()
+            android.util.Log.i("RosenwegSpeicher", "Fossify leert den Nachrichten-Cache (wasDbCleared=false): $n SMS-Zeilen, Rosenweg bleibt")
             config.wasDbCleared = true
             Handler(Looper.getMainLooper()).post(callback)
         }

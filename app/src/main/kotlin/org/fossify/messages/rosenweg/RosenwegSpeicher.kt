@@ -440,6 +440,11 @@ class RosenwegSpeicher private constructor(context: Context) {
         personen = null
         val chats = dao.chats()
         val threads = chats.map { it.threadId }.toSet()
+        try {
+            Log.i(TAG, "Spiegel-Pruefung: ${app.messagesDB.countRosenwegMirror()} Rosenweg-Zeilen im Fossify-Cache vor dem Neuschreiben")
+        } catch (e: Exception) {
+            Log.w(TAG, "Spiegel zaehlen", e)
+        }
         for (chat in chats) {
             val alle = dao.nachrichten(chat.id)
             val vorher = try {
