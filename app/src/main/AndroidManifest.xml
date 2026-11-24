@@ -24,6 +24,10 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_REMOTE_MESSAGING" />
     <uses-permission android:name="ch.rosenweg4303.permission.ANLAGE" />
+    <!-- Notfall: rotes Vollbild, Vibration, Sirene auch bei "Nicht stören" -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
 
     <uses-permission android:name="android.permission.READ_CONTACTS" />
     <uses-permission
@@ -161,6 +165,16 @@
             android:exported="false"
             android:label="@string/contact_details"
             android:parentActivityName=".activities.ThreadActivity" />
+
+        <activity
+            android:name=".rosenweg.NotfallActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:showWhenLocked="true"
+            android:taskAffinity="ch.rosenweg4303.messages.notfall"
+            android:theme="@android:style/Theme.Material.NoActionBar.Fullscreen"
+            android:turnScreenOn="true" />
 
         <activity
             android:name=".rosenweg.RosenwegGruppeActivity"

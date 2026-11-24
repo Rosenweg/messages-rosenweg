@@ -93,3 +93,18 @@ class MedienTest {
         org.junit.Assert.assertEquals("foto.jpg", parseLiveNachricht("group/g/msg/1", payload)!!.mediaName)
     }
 }
+
+class NotfallRegelnTest {
+    @org.junit.Test
+    fun entwarnungUndNotfall() {
+        for (t in listOf("Stop", "stopp!", "Entwarnung.", " alles ok ", "Vorbei!!", "ALLES GUT")) {
+            org.junit.Assert.assertTrue(t, RosenwegNotfall.istEntwarnung(t))
+        }
+        for (t in listOf("Feuer im Keller", "stop the fire", "", null)) {
+            org.junit.Assert.assertFalse("$t", RosenwegNotfall.istEntwarnung(t))
+        }
+        org.junit.Assert.assertTrue(RosenwegNotfall.istNotfall("notfall", null))
+        org.junit.Assert.assertTrue(RosenwegNotfall.istNotfall("technik", "emergency"))
+        org.junit.Assert.assertFalse(RosenwegNotfall.istNotfall("ankuendigungen", null))
+    }
+}

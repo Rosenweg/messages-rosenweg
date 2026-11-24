@@ -677,8 +677,9 @@ class MessengerVerbindung : Service() {
         try {
             when {
                 topic == RosenwegTopics.KRISE -> {
-                    // Notfall-UX folgt in einem spaeteren Schritt; hier nur protokollieren.
-                    Log.i(TAG, "sys/crisis: $text")
+                    val aktiv = (parseJson(text) as? kotlinx.serialization.json.JsonObject)?.bool("active") == true
+                    Log.i(TAG, "sys/crisis: aktiv=$aktiv")
+                    RosenwegNotfall.krise(this, aktiv)
                 }
 
                 topic.startsWith("receipt/") -> {
@@ -709,6 +710,14 @@ class MessengerVerbindung : Service() {
                     refreshMessages()
                     refreshConversations()
                     if (e.nachricht.media != null) ladeMedien(e.nachricht)
+                    // Notfall/Entwarnung nur fuer frische Live-Nachrichten (nicht < 10 min alt)
+                    if (e.neu && System.currentTimeMillis() - d.ts < 10 * 60_000) {
+                        val eigen = e.nachricht.senderId == speicher.eigeneId
+                        val istEntwarnung = chat.id == "notfall" && (d.clear || RosenwegNotfall.istEntwarnung(d.body))
+                        if (!eigen || istEntwarnung) {
+                            RosenwegNotfall.pruefe(this, chat, d, speicher.titel(chat), e.absenderName)
+                        }
+                    }
                     if (e.neu && e.nachricht.senderId != speicher.eigeneId) {
                         sendeQuittungen()
                         benachrichtige(e)
