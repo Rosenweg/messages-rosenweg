@@ -183,6 +183,7 @@ class MainActivity : SimpleActivity() {
 
         binding.mainMenu.requireToolbar().setOnMenuItemClickListener { menuItem ->
             when (menuItem.itemId) {
+                R.id.rw_neuer_chat -> org.fossify.messages.rosenweg.RosenwegNeuerChat.zeige(this)
                 R.id.show_recycle_bin -> launchRecycleBin()
                 R.id.show_archived -> launchArchivedConversations()
                 R.id.settings -> launchSettings()
@@ -195,6 +196,8 @@ class MainActivity : SimpleActivity() {
 
     private fun refreshMenuItems() {
         binding.mainMenu.requireToolbar().menu.apply {
+            findItem(R.id.rw_neuer_chat).isVisible = MessengerVerbindung.istAktiv() ||
+                org.fossify.messages.rosenweg.RosenwegKonto.eigeneIdGespeichert(this@MainActivity) != null
             findItem(R.id.show_recycle_bin).isVisible = config.useRecycleBin
             findItem(R.id.show_archived).isVisible = config.isArchiveAvailable
         }

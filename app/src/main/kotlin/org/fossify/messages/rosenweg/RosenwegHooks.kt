@@ -142,6 +142,47 @@ object RosenwegHooks {
         }
     }
 
+    // ── schreibt … / online ─────────────────────────────────────────────
+
+    private var letztesTippen = 0L
+    private var tippChat: String? = null
+
+    /** Eingabe im Thread: hoechstens alle 3 s "schreibt" senden */
+    fun tippe(context: Context, threadId: Long, leer: Boolean) {
+        if (!threadId.isRosenwegThread()) return
+        val app = context.applicationContext
+        ensureBackgroundThread {
+            val chat = RosenwegSpeicher.get(app).chatZuThread(threadId) ?: return@ensureBackgroundThread
+            val jetzt = System.currentTimeMillis()
+            if (leer) {
+                if (tippChat == chat.id) MessengerVerbindung.tippe(chat.id, false)
+                tippChat = null
+                letztesTippen = 0
+            } else if (jetzt - letztesTippen > 3_000 || tippChat != chat.id) {
+                letztesTippen = jetzt
+                tippChat = chat.id
+                MessengerVerbindung.tippe(chat.id, true)
+            }
+        }
+    }
+
+    /** Untertitel im Thread: "Anna schreibt …" bzw. bei DMs "online" / "zuletzt online …" */
+    fun untertitel(context: Context, threadId: Long): String? {
+        val s = RosenwegSpeicher.get(context)
+        val chat = s.chatZuThread(threadId) ?: return null
+        val schreibend = RosenwegLive.schreibende(chat.id)
+        if (schreibend.isNotEmpty()) {
+            return if (schreibend.size == 1) "${s.name(schreibend[0])} schreibt …" else "${schreibend.size} Personen schreiben …"
+        }
+        if (chat.kind != "dm") return null
+        val p = s.dmPartner(chat)?.let { RosenwegLive.praesenz(it) } ?: return null
+        if (p.online) return "online"
+        val zeit = java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT).format(java.util.Date(p.ts))
+        val heute = android.text.format.DateUtils.isToday(p.ts)
+        val datum = if (heute) "heute" else java.text.DateFormat.getDateInstance(java.text.DateFormat.SHORT).format(java.util.Date(p.ts))
+        return "zuletzt online $datum $zeit"
+    }
+
     fun markiereThreadGelesen(context: Context, threadId: Long) =
         RosenwegSpeicher.get(context).markiereThreadGelesen(threadId)
 

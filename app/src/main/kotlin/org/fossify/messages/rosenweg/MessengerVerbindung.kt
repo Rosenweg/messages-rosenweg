@@ -103,6 +103,32 @@ class MessengerVerbindung : Service() {
 
         fun istAktiv() = laeuft
 
+        /** "schreibt …" an die anderen (qos 0, typing/<conv>) */
+        fun tippe(chatId: String, tippt: Boolean) {
+            instanz?.let { d ->
+                try {
+                    d.arbeiter.execute {
+                        val c = d.client ?: return@execute
+                        val ich = d.konto?.userId ?: return@execute
+                        val chat = d.chatsNachId[chatId] ?: return@execute
+                        if (!d.verbunden || !chat.canWrite) return@execute
+                        c.publish("typing/$chatId", RosenwegLive.tippNutzlast(ich, tippt).toByteArray(), 0, false)
+                    }
+                } catch (_: Exception) {
+                }
+            }
+        }
+
+        /** Nach neuem Gespraech/Mitgliedschaft: frisches JWT (Topic-Rechte) und neu abonnieren. */
+        fun neuVerbinden() {
+            instanz?.let { d ->
+                try {
+                    d.arbeiter.execute { d.verbinde() }
+                } catch (_: Exception) {
+                }
+            }
+        }
+
         /** Vom Ping-Alarm (RosenwegPingReceiver), mit gehaltenem WakeLock. */
         internal fun pingVomAlarm(context: Context, wachhalten: PowerManager.WakeLock) {
             val dienst = instanz
@@ -394,10 +420,12 @@ class MessengerVerbindung : Service() {
         c.publish(RosenwegTopics.presence(k.userId), bauePresence(true).toByteArray(), 1, true)
         val filter = ArrayList<String>()
         filter.add(RosenwegTopics.KRISE)
+        filter.add("presence/#")
         for (chat in chatsNachId.values) {
             filter.add(RosenwegTopics.empfangsFilter(chat.topicPrefix))
             filter.add(RosenwegTopics.control(chat.id))
             filter.add(RwQuittung.filter(chat.id))
+            filter.add("typing/${chat.id}")
         }
         c.subscribe(filter, 1) { codes ->
             if (codes.any { it == 0x80 }) Log.w(TAG, "Abonnement teilweise abgelehnt: $codes")
@@ -682,6 +710,10 @@ class MessengerVerbindung : Service() {
                     RosenwegNotfall.krise(this, aktiv)
                 }
 
+                topic.startsWith("presence/") -> RosenwegLive.nimmPraesenz(topic, text)
+
+                topic.startsWith("typing/") -> RosenwegLive.nimmTippen(topic, text, speicher.eigeneId)
+
                 topic.startsWith("receipt/") -> {
                     val q = RwQuittung.parse(topic, text) ?: return
                     if (q.chatId !in chatsNachId) return
@@ -709,6 +741,7 @@ class MessengerVerbindung : Service() {
                     val e = speicher.nimmAuf(speicher.chat(chat.id) ?: chat, klartext(chat, d), ausVerlauf = false, gelesen = false)
                     refreshMessages()
                     refreshConversations()
+                    RosenwegLive.nachrichtVon(chat.id, e.nachricht.senderId)
                     if (e.nachricht.media != null) ladeMedien(e.nachricht)
                     // Notfall/Entwarnung nur fuer frische Live-Nachrichten (nicht < 10 min alt)
                     if (e.neu && System.currentTimeMillis() - d.ts < 10 * 60_000) {

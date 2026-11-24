@@ -275,6 +275,24 @@ class RosenwegSpeicher private constructor(context: Context) {
         ergebnis
     }
 
+    /** Neu angelegtes Gespraech sofort aufnehmen (der Dienst gleicht danach mit neuem Token ab). */
+    fun nimmGespraechAuf(g: RwGespraechDaten): RwChat = synchronized(sperre) {
+        dao.chat(g.id)?.let { return it }
+        val ich = eigeneId
+        val members = (g.participants.takeIf { it.isNotEmpty() } ?: listOfNotNull(ich))
+        var chat = RwChat(
+            id = g.id, kind = g.kind, title = g.title, topicPrefix = g.topicPrefix, metadata = g.metadata,
+            role = if (g.kind == "group") "admin" else "member",
+            members = JsonArray(members.map { JsonPrimitive(it) }).toString(),
+            canWrite = true, avatar = g.avatar,
+        )
+        val seq = dao.neuerChat(chat)
+        chat = chat.copy(seq = seq, threadId = RosenwegIds.threadId(seq))
+        dao.aendereChat(chat)
+        spiegleGespraech(chat)
+        chat
+    }
+
     // ── Nachrichten aufnehmen ───────────────────────────────────────────
 
     /**

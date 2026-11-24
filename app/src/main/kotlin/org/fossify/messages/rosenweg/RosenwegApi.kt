@@ -112,6 +112,24 @@ class RosenwegApi(private val konto: RosenwegKonto) {
         anfrage("POST", "/api/messages/${enc(chatId)}/delete", buildJsonObject { put("clientMsgId", clientMsgId) }.toString())
     }
 
+    /** POST /api/conversations: DM (idempotent) oder Gruppe; Rueckgabe das Gespraech */
+    fun neuesGespraech(dmMit: String?, gruppenTitel: String?, mitglieder: List<String>): RwGespraechDaten {
+        val body = buildJsonObject {
+            if (dmMit != null) {
+                put("kind", "dm")
+                put("memberIds", kotlinx.serialization.json.JsonArray(listOf(kotlinx.serialization.json.JsonPrimitive(dmMit))))
+            } else {
+                put("kind", "group")
+                put("title", gruppenTitel ?: "")
+                put("memberIds", kotlinx.serialization.json.JsonArray(mitglieder.map { kotlinx.serialization.json.JsonPrimitive(it) }))
+            }
+        }.toString()
+        val o = parseJson(anfrage("POST", "/api/conversations", body)) as? JsonObject ?: throw IOException("keine Antwort")
+        val c = o.obj("conversation") ?: throw IOException("conversation fehlt")
+        return parseGespraeche(JsonObject(mapOf("conversations" to kotlinx.serialization.json.JsonArray(listOf(c)))).toString())
+            .firstOrNull() ?: throw IOException("Gespraech unlesbar")
+    }
+
     // ── Gruppen-Verwaltung (wie pwa/app.js) ─────────────────────────────
 
     data class Mitglied(val userId: String, val role: String)

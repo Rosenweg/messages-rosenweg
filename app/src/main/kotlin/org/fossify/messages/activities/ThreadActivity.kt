@@ -292,6 +292,10 @@ class ThreadActivity : SimpleActivity() {
         )
 
         isActivityVisible = true
+        if (isRosenweg) {
+            org.fossify.messages.rosenweg.RosenwegLive.beobachter = { zeigeUntertitel() }
+            zeigeUntertitel()
+        }
 
         notificationManager.cancel(threadId.hashCode())
 
@@ -323,6 +327,10 @@ class ThreadActivity : SimpleActivity() {
 
     override fun onPause() {
         super.onPause()
+        if (isRosenweg) {
+            org.fossify.messages.rosenweg.RosenwegLive.beobachter = null
+            RosenwegHooks.tippe(this, threadId, true)
+        }
         saveDraftMessage()
         bus?.post(Events.RefreshConversations())
         isActivityVisible = false
@@ -909,6 +917,7 @@ class ThreadActivity : SimpleActivity() {
 
             threadSendMessage.isClickable = false
             threadTypeMessage.onTextChangeListener {
+                if (isRosenweg) RosenwegHooks.tippe(this@ThreadActivity, threadId, it.isEmpty())
                 messageToResend = null
                 checkSendMessageAvailability()
                 val messageString = if (config.useSimpleCharacters) {
@@ -1101,6 +1110,19 @@ class ThreadActivity : SimpleActivity() {
             R.id.cab_rw_reagieren -> reagieren(message.id)
             R.id.cab_rw_bearbeiten -> bearbeiten(message.id)
             R.id.cab_rw_loeschen -> loeschenFuerAlle(message.id)
+        }
+    }
+
+    /** Rosenweg: "schreibt …" / "online" als Untertitel; "schreibt" laeuft nach 6 s aus */
+    private fun zeigeUntertitel() {
+        ensureBackgroundThread {
+            val text = RosenwegHooks.untertitel(this, threadId)
+            runOnUiThread {
+                binding.threadToolbar.subtitle = text
+                if (text?.endsWith("…") == true) {
+                    binding.threadToolbar.postDelayed({ if (isActivityVisible) zeigeUntertitel() }, 6_500)
+                }
+            }
         }
     }
 
