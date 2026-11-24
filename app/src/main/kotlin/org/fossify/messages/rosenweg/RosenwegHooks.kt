@@ -3,10 +3,10 @@ package org.fossify.messages.rosenweg
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import org.fossify.commons.extensions.toast
 import org.fossify.commons.helpers.ensureBackgroundThread
 import org.fossify.commons.models.SimpleContact
-import org.fossify.messages.extensions.messagesDB
 import org.fossify.messages.helpers.refreshConversations
 import org.fossify.messages.helpers.refreshMessages
 import org.fossify.messages.models.Conversation
@@ -21,20 +21,13 @@ object RosenwegHooks {
     const val TEXT_NUR_LESEN = "In diesem Kanal kannst du nur lesen"
 
     /** Context.getMessages fuer Rosenweg-Threads: aus der Fossify-DB (Spiegel). */
-    fun nachrichten(context: Context, threadId: Long, dateFrom: Int, limit: Int): ArrayList<Message> {
-        val alle = try {
-            context.messagesDB.getNonRecycledThreadMessages(threadId)
-        } catch (_: Exception) {
-            emptyList()
+    fun nachrichten(context: Context, threadId: Long, dateFrom: Int, limit: Int): ArrayList<Message> =
+        try {
+            RosenwegSpeicher.get(context).fossifyNachrichten(threadId, dateFrom, limit)
+        } catch (e: Exception) {
+            Log.w("RosenwegHooks", "Nachrichten fuer Thread $threadId", e)
+            ArrayList()
         }
-        return ArrayList(
-            alle.asSequence()
-                .filter { dateFrom == -1 || it.date < dateFrom }
-                .sortedWith(compareBy<Message> { it.date }.thenBy { -it.id })
-                .toList()
-                .takeLast(limit)
-        )
-    }
 
     fun conversation(context: Context, threadId: Long): Conversation? =
         RosenwegSpeicher.get(context).conversationZuThread(threadId)

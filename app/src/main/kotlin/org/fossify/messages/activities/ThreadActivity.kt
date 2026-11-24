@@ -441,6 +441,8 @@ class ThreadActivity : SimpleActivity() {
             messages = try {
                 if (isRecycleBin) {
                     messagesDB.getThreadMessagesFromRecycleBin(threadId)
+                } else if (isRosenweg) {
+                    RosenwegHooks.nachrichten(this, threadId, -1, MESSAGES_LIMIT)
                 } else {
                     if (config.useRecycleBin) {
                         messagesDB.getNonRecycledThreadMessages(threadId)

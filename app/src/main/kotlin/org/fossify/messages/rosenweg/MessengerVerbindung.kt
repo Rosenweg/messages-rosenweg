@@ -281,12 +281,12 @@ class MessengerVerbindung : Service() {
                     }
                 }
             }
+            val chats = speicher.gleicheGespraecheAb(gespraeche, pubTopics, mitglieder)
             if (!spiegelGeprueft) {
-                // Fossify leert seine DB einmalig (clearAllMessagesIfNeeded) - Spiegel sicher neu schreiben
-                speicher.spiegleAlles()
+                // Spiegel pruefen/neu schreiben, verwaiste Rosenweg-Threads entfernen (einmal je Prozess)
+                speicher.pruefeSpiegel()
                 spiegelGeprueft = true
             }
-            val chats = speicher.gleicheGespraecheAb(gespraeche, pubTopics, mitglieder)
             chatsNachPrefix = chats.associateBy { it.topicPrefix }
             chatsNachId = chats.associateBy { it.id }
             refreshConversations()

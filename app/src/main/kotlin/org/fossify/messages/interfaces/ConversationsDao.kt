@@ -56,4 +56,8 @@ interface ConversationsDao {
 
     @Query("DELETE FROM conversations WHERE thread_id = :threadId")
     fun deleteThreadId(threadId: Long)
+
+    /** Rosenweg-Threads (negative IDs), fuer die Pruefung verwaister Spiegel */
+    @Query("SELECT thread_id FROM conversations WHERE thread_id < 0")
+    fun getRosenwegThreadIds(): List<Long>
 }

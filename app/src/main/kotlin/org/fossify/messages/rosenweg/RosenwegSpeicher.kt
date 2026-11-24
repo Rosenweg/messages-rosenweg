@@ -2,6 +2,7 @@ package org.fossify.messages.rosenweg
 
 import android.content.Context
 import android.provider.Telephony
+import android.util.Log
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
@@ -34,6 +35,7 @@ class RosenwegSpeicher private constructor(context: Context) {
     private val QUITTUNG_ERSTIMPORT_MS = 7L * 24 * 60 * 60 * 1000
 
     companion object {
+        private const val TAG = "RosenwegSpeicher"
         const val NAME_SYSTEM = "Rosenweg"
         const val NAME_DU = "Du"
         const val NAME_UNBEKANNT = "Unbekannt"
@@ -360,7 +362,7 @@ class RosenwegSpeicher private constructor(context: Context) {
         reactions = reaktionenAusJson(m.reactions),
     )
 
-    private fun spiegleNachricht(chat: RwChat, m: RwMessage) {
+    private fun baueMessage(chat: RwChat, m: RwMessage): Message {
         val eigen = m.senderId == eigeneId
         val typ = when {
             !eigen -> Telephony.Sms.MESSAGE_TYPE_INBOX
@@ -370,24 +372,97 @@ class RosenwegSpeicher private constructor(context: Context) {
         }
         val absender = kontakt(m.senderId)
         val status = if (eigen && m.status == RwStatus.GESENDET) haken(chat, m) else Telephony.Sms.STATUS_NONE
-        app.messagesDB.insertOrUpdate(
-            Message(
-                id = m.mirroredMessageId,
-                body = anzeige(m),
-                type = typ,
-                status = status,
-                participants = arrayListOf(absender),
-                date = (m.ts / 1000).toInt(),
-                read = m.read,
-                threadId = chat.threadId,
-                isMMS = false,
-                attachment = null,
-                senderPhoneNumber = RW_ADRESSE + m.senderId,
-                senderName = absender.name,
-                senderPhotoUri = absender.photoUri,
-                subscriptionId = -1,
-            )
+        return Message(
+            id = m.mirroredMessageId,
+            body = anzeige(m),
+            type = typ,
+            status = status,
+            participants = arrayListOf(absender),
+            date = (m.ts / 1000).toInt(),
+            read = m.read,
+            threadId = chat.threadId,
+            isMMS = false,
+            attachment = null,
+            senderPhoneNumber = RW_ADRESSE + m.senderId,
+            senderName = absender.name,
+            senderPhotoUri = absender.photoUri,
+            subscriptionId = -1,
         )
+    }
+
+    private fun spiegleNachricht(chat: RwChat, m: RwMessage) {
+        app.messagesDB.insertOrUpdate(baueMessage(chat, m))
+    }
+
+    /**
+     * Nachrichten eines Rosenweg-Threads direkt aus dem Speicher (nicht aus dem
+     * Fossify-Spiegel), damit ein beschaedigter/fehlender Spiegel den Thread nie
+     * leer erscheinen laesst. Fehlt der Spiegel, wird er nachgefuehrt.
+     */
+    fun fossifyNachrichten(threadId: Long, dateFrom: Int, limit: Int): ArrayList<Message> = synchronized(sperre) {
+        val chat = dao.chatZuThread(threadId)
+        if (chat == null) {
+            Log.w(TAG, "kein Rosenweg-Chat fuer Thread $threadId")
+            return ArrayList()
+        }
+        val papierkorb = try {
+            app.messagesDB.getRecycledRosenwegIds().toHashSet()
+        } catch (e: Exception) {
+            Log.w(TAG, "Papierkorb nicht lesbar", e)
+            HashSet()
+        }
+        val alle = dao.nachrichten(chat.id)
+        try {
+            val gespiegelt = app.messagesDB.getThreadMessageIds(threadId).toHashSet()
+            val fehlend = alle.filter { it.mirroredMessageId !in gespiegelt }
+            if (fehlend.isNotEmpty()) {
+                Log.w(TAG, "Spiegel unvollstaendig: chat=${chat.id} thread=$threadId speicher=${alle.size} spiegel=${gespiegelt.size} - ergaenze ${fehlend.size}")
+                fehlend.forEach { spiegleNachricht(chat, it) }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Spiegel-Pruefung ${chat.id}", e)
+        }
+        ArrayList(
+            alle.asSequence()
+                .filter { it.mirroredMessageId !in papierkorb }
+                .filter { dateFrom == -1 || (it.ts / 1000) < dateFrom }
+                .map { baueMessage(chat, it) }
+                .toList()
+                .takeLast(limit)
+        )
+    }
+
+    /**
+     * Pruefung beim Dienststart: Spiegel aller Chats vollstaendig neu schreiben,
+     * verwaiste Rosenweg-Gespraeche/-Nachrichten (Thread ohne Chat) entfernen, Zahlen loggen.
+     */
+    fun pruefeSpiegel(): Unit = synchronized(sperre) {
+        personen = null
+        val chats = dao.chats()
+        val threads = chats.map { it.threadId }.toSet()
+        for (chat in chats) {
+            val alle = dao.nachrichten(chat.id)
+            val vorher = try {
+                app.messagesDB.getThreadMessageIds(chat.threadId).size
+            } catch (e: Exception) {
+                -1
+            }
+            alle.forEach { spiegleNachricht(chat, it) }
+            spiegleGespraech(chat)
+            Log.i(TAG, "Spiegel: chat=${chat.id} thread=${chat.threadId} speicher=${alle.size} spiegel_vorher=$vorher")
+        }
+        try {
+            app.conversationsDB.getRosenwegThreadIds().filter { it !in threads }.forEach {
+                Log.w(TAG, "verwaistes Rosenweg-Gespraech $it entfernt")
+                app.conversationsDB.deleteThreadId(it)
+            }
+            app.messagesDB.getRosenwegMirrorThreadIds().filter { it !in threads }.forEach {
+                Log.w(TAG, "verwaiste Rosenweg-Nachrichten in Thread $it entfernt")
+                app.messagesDB.deleteRosenwegMirrorThread(it)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Pruefung verwaister Spiegel", e)
+        }
     }
 
     private fun baueConversation(chat: RwChat): Conversation {

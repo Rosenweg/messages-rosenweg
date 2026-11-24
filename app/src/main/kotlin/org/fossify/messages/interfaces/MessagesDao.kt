@@ -94,4 +94,17 @@ interface MessagesDao {
 
     @Query("DELETE FROM messages")
     fun deleteAll()
+
+    // Rosenweg (negative IDs): leichte Abfragen ohne Typ-Konverter fuer Pruefung/Reparatur
+    @Query("SELECT id FROM recycle_bin_messages WHERE id < 0")
+    fun getRecycledRosenwegIds(): List<Long>
+
+    @Query("SELECT id FROM messages WHERE thread_id = :threadId")
+    fun getThreadMessageIds(threadId: Long): List<Long>
+
+    @Query("SELECT DISTINCT thread_id FROM messages WHERE id < 0 OR thread_id < 0")
+    fun getRosenwegMirrorThreadIds(): List<Long>
+
+    @Query("DELETE FROM messages WHERE thread_id = :threadId AND (id < 0 OR thread_id < 0)")
+    fun deleteRosenwegMirrorThread(threadId: Long)
 }

@@ -165,11 +165,16 @@ abstract class BaseConversationsAdapter(
             }
 
             conversationDate.apply {
-                text = (conversation.date * 1000L).formatDateOrTime(
-                    context = context,
-                    hideTimeOnOtherDays = true,
-                    showCurrentYear = false
-                )
+                // Rosenweg-Chats ohne Nachrichten haben Datum 0: kein Datum anzeigen
+                text = if (conversation.date <= 0) {
+                    ""
+                } else {
+                    (conversation.date * 1000L).formatDateOrTime(
+                        context = context,
+                        hideTimeOnOtherDays = true,
+                        showCurrentYear = false
+                    )
+                }
 
                 setTextSize(TypedValue.COMPLEX_UNIT_PX, fontSize * 0.8f)
             }
