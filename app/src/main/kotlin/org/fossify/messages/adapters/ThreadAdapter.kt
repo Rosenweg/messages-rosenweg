@@ -40,6 +40,7 @@ import org.fossify.commons.extensions.beVisibleIf
 import org.fossify.commons.extensions.copyToClipboard
 import org.fossify.commons.extensions.formatDateOrTime
 import org.fossify.commons.extensions.getContrastColor
+import org.fossify.commons.extensions.getProperBackgroundColor
 import org.fossify.commons.extensions.getProperPrimaryColor
 import org.fossify.commons.extensions.getTextSize
 import org.fossify.commons.extensions.getTimeFormat
@@ -262,13 +263,13 @@ class ThreadAdapter(
         if (selectedMessages.isEmpty()) return
 
         val textToCopy = if (selectedMessages.size == 1) {
-            selectedMessages.first().body
+            selectedMessages.first().klartext()
         } else {
             selectedMessages.filter { it.body.isNotEmpty() }.joinToString("\n\n") { message ->
                 val format = "${activity.config.dateFormat}, ${activity.getTimeFormat()}"
                 val dateTime = DateTime(message.millis()).toString(format)
                 val sender = if (message.isReceivedMessage()) message.senderName else activity.getString(R.string.me)
-                "[$dateTime] $sender: ${message.body}"
+                "[$dateTime] $sender: ${message.klartext()}"
             }
         }
 
@@ -297,7 +298,7 @@ class ThreadAdapter(
     private fun selectText() {
         val firstItem = getSelectedItems().firstOrNull() as? Message ?: return
         if (firstItem.body.trim().isNotEmpty()) {
-            SelectTextDialog(activity, firstItem.body)
+            SelectTextDialog(activity, firstItem.klartext())
         }
     }
 
@@ -430,6 +431,13 @@ class ThreadAdapter(
                 setupSentMessageView(messageBinding = this, message = message)
             }
 
+            // Rosenweg: Zitat-Kasten, Absendername, Reaktions-Chip (SMS unveraendert)
+            if (message.id < 0) {
+                setupRosenwegTeile(this, message)
+            } else {
+                threadMessageReactions.beGone()
+            }
+
             threadMessageAttachmentsHolder.removeAllViews()
             if (message.attachment?.attachments?.isNotEmpty() == true) {
                 threadMessageAttachmentsHolder.beVisible()
@@ -450,6 +458,37 @@ class ThreadAdapter(
                 threadMessagePlayOutline.beGone()
             }
         }
+    }
+
+    private fun setupRosenwegTeile(b: ItemMessageBinding, message: Message) {
+        val teile = org.fossify.messages.rosenweg.zerlegeAnzeige(message.body)
+        val empfangen = message.isReceivedMessage()
+        val schrift = b.threadMessageBody.currentTextColor
+        val akzent = if (empfangen) activity.getProperPrimaryColor() else schrift
+        val absender = if (showSenderNames && empfangen && message.senderName.isNotEmpty()) message.senderName else null
+        val text = org.fossify.messages.rosenweg.RwZitat.baue(b.threadMessageBody, teile, absender, schrift, akzent)
+        b.threadMessageBody.text = text
+        b.threadMessageBody.beVisibleIf(text.isNotEmpty())
+
+        val chip = b.threadMessageReactions
+        if (teile.reaktionen == null) {
+            chip.beGone()
+            return
+        }
+        val dp = activity.resources.displayMetrics.density
+        chip.text = teile.reaktionen
+        chip.setTextColor(textColor)
+        chip.background = org.fossify.messages.rosenweg.RwZitat.chipHintergrund(
+            activity.getProperBackgroundColor(), textColor.adjustAlpha(0.25f), dp
+        )
+        (chip.layoutParams as RelativeLayout.LayoutParams).apply {
+            removeRule(RelativeLayout.ALIGN_START)
+            removeRule(RelativeLayout.ALIGN_END)
+            addRule(if (empfangen) RelativeLayout.ALIGN_START else RelativeLayout.ALIGN_END, b.threadMessageBody.id)
+            marginStart = if (empfangen) (10 * dp).toInt() else 0
+            marginEnd = if (empfangen) 0 else (10 * dp).toInt()
+        }
+        chip.beVisible()
     }
 
     private fun setupReceivedMessageView(messageBinding: ItemMessageBinding, message: Message) {
@@ -717,6 +756,9 @@ class ThreadAdapter(
 
     inner class ThreadViewHolder(val binding: ViewBinding) : ViewHolder(binding.root)
 }
+
+/** Rosenweg: Text ohne Zitat-Zeile und Reaktions-Chip (SMS unveraendert) */
+private fun Message.klartext(): String = if (id < 0) org.fossify.messages.rosenweg.zerlegeAnzeige(body).text else body
 
 private class ThreadItemDiffCallback : DiffUtil.ItemCallback<ThreadItem>() {
 

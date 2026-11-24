@@ -238,6 +238,10 @@ class ThreadActivity : SimpleActivity() {
     @Volatile
     private var rwFokus = false
 
+    /** nach dem Senden einer Rosenweg-Nachricht beim naechsten Neuzeichnen ans Ende */
+    @Volatile
+    private var rwNachSendenScrollen = false
+
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         rwFokus = hasFocus
@@ -656,7 +660,16 @@ class ThreadActivity : SimpleActivity() {
                 val shouldScrollToBottom =
                     currentList.lastOrNull() != latestThreadItems.lastOrNull() &&
                             lastPosition - lastVisiblePosition == 1
-                updateMessages(latestThreadItems, if (shouldScrollToBottom) lastPosition else -1)
+                if (isRosenweg) {
+                    // Rosenweg: nach dem Senden immer, sonst wenn man schon (fast) unten ist
+                    val neu = currentList.lastOrNull() != latestThreadItems.lastOrNull()
+                    val unten = lastVisiblePosition < 0 || lastPosition - lastVisiblePosition <= 1
+                    val scrollen = rwNachSendenScrollen || (neu && unten)
+                    if (neu) rwNachSendenScrollen = false
+                    updateMessages(latestThreadItems, if (scrollen) latestThreadItems.lastIndex else -1)
+                } else {
+                    updateMessages(latestThreadItems, if (shouldScrollToBottom) lastPosition else -1)
+                }
             }
         }
 
@@ -1898,6 +1911,7 @@ class ThreadActivity : SimpleActivity() {
         if (text.isBlank() && anhaenge.isEmpty()) return
         val rwThreadId = threadId
         val antwort = rwAntwortAuf
+        rwNachSendenScrollen = true
         clearCurrentMessage()
         beendeAntwort()
         ensureBackgroundThread {

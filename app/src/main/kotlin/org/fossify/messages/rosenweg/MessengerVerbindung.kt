@@ -818,7 +818,7 @@ class MessengerVerbindung : Service() {
             isMms = false,
             address = RW_ADRESSE + e.chat.id,
             senderName = absender,
-            body = e.anzeige,
+            body = ausschnitt(e.anzeige),
             threadId = e.chat.threadId,
             bitmap = getNotificationBitmap(
                 speicher.personenBildFuer(e.nachricht.senderId).ifEmpty { speicher.gespraechsBild(e.chat) }

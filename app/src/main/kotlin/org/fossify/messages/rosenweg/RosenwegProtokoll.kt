@@ -194,6 +194,9 @@ data class RwNachrichtDaten(
     val editedAt: Long? = null,
     val deleted: Boolean = false,
     val replyPreview: String? = null,
+    /** replyTo.senderId / replyTo.clientMsgId der zitierten Nachricht */
+    val replyAbsender: String? = null,
+    val replyClientMsgId: String? = null,
     val mediaName: String? = null,
     /** Medien-Beschreibung als JSON (Gruppe: payload.media; DM: aus RWMEDIA1 im Klartext) */
     val mediaJson: String? = null,
@@ -220,6 +223,8 @@ fun parseLiveNachricht(topic: String, payload: String, jetztMs: Long = System.cu
         ciphertext = (o["ciphertext"] ?: o["bundle"])?.takeIf { it !is JsonNull }?.toString(),
         ts = parseZeit(o["ts"]) ?: jetztMs,
         replyPreview = o.obj("replyTo")?.str("preview"),
+        replyAbsender = o.obj("replyTo")?.str("senderId")?.let { normiereId(it) },
+        replyClientMsgId = o.obj("replyTo")?.str("clientMsgId"),
         mediaName = o.obj("media")?.let { medienName(it) },
         mediaJson = o.obj("media")?.toString(),
         priority = o.str("priority"),
@@ -259,6 +264,8 @@ fun parseVerlauf(text: String): List<RwNachrichtDaten> {
             editedAt = parseZeit(m["edited_at"]),
             deleted = m.bool("deleted") == true || (m["deleted_at"]?.let { it !is JsonNull } ?: false),
             replyPreview = replyObj?.str("preview"),
+            replyAbsender = replyObj?.str("senderId")?.let { normiereId(it) },
+            replyClientMsgId = replyObj?.str("clientMsgId"),
             mediaName = media?.let { medienName(it) },
             mediaJson = media?.toString(),
             reactions = reactions,
@@ -429,6 +436,40 @@ fun wendeReaktionAn(r: Map<String, List<String>>, userId: String, emoji: String,
 
 // ── Anzeige-Text der gespiegelten Fossify-Nachricht ─────────────────────
 
+/** U+2063 (unsichtbares Trennzeichen) vor dem Reaktions-Chip im gespiegelten Text */
+const val RW_REAKTION_MARKE = "\u2063"
+
+/** Zitat-Zeile am Anfang: "↪ Name: Text\n" */
+const val RW_ZITAT_MARKE = "↪ "
+
+/** WhatsApp-Art: bis zu 3 Emojis (haeufigste zuerst), dahinter die Gesamtzahl ab 2 */
+fun reaktionsChip(r: Map<String, List<String>>): String? {
+    val n = r.values.sumOf { it.size }
+    if (n == 0) return null
+    val emojis = r.entries.sortedByDescending { it.value.size }.take(3).joinToString(" ") { it.key }
+    return if (n > 1) "$emojis $n" else emojis
+}
+
+/** Anzeige-Text zerlegen: (Zitat-Name, Zitat-Text) oder null, eigentlicher Text, Reaktions-Chip */
+data class RwTeile(val zitatName: String?, val zitatText: String?, val text: String, val reaktionen: String?)
+
+fun zerlegeAnzeige(body: String): RwTeile {
+    var rest = body
+    val reaktionen = rest.substringAfter(RW_REAKTION_MARKE, "").takeIf { it.isNotEmpty() }
+    rest = rest.substringBefore(RW_REAKTION_MARKE)
+    if (rest.startsWith(RW_ZITAT_MARKE) && rest.contains('\n')) {
+        val zeile = rest.substring(RW_ZITAT_MARKE.length, rest.indexOf('\n'))
+        val text = rest.substring(rest.indexOf('\n') + 1)
+        val name = zeile.substringBefore(": ", "").takeIf { it.isNotEmpty() }
+        val zitat = if (name != null) zeile.substringAfter(": ") else zeile
+        return RwTeile(name, zitat, text, reaktionen)
+    }
+    return RwTeile(null, null, rest, reaktionen)
+}
+
+/** fuer Gespraechsliste/Ausschnitt: ohne Zitat-Zeile und Reaktionen */
+fun ausschnitt(body: String): String = zerlegeAnzeige(body).text
+
 const val RW_TEXT_VERSCHLUESSELT = "🔒 Vor der Anmeldung an diesem Gerät verschlüsselt"
 const val RW_TEXT_GELOESCHT = "🚫 Nachricht gelöscht"
 
@@ -443,7 +484,7 @@ fun anzeigeText(
 ): String {
     if (deleted) return RW_TEXT_GELOESCHT
     val sb = StringBuilder()
-    if (!replyPreview.isNullOrBlank()) sb.append("↪ ").append(replyPreview.take(80)).append('\n')
+    if (!replyPreview.isNullOrBlank()) sb.append(RW_ZITAT_MARKE).append(replyPreview.replace('\n', ' ').take(90)).append('\n')
     when {
         body != null -> sb.append(body)
         ciphertext != null -> sb.append(RW_TEXT_VERSCHLUESSELT)
@@ -453,10 +494,9 @@ fun anzeigeText(
         sb.append("📎 ").append(mediaName)
     }
     if (editedAt != null) sb.append(" (bearbeitet)")
-    if (reactions.isNotEmpty()) {
-        sb.append(" · ")
-        sb.append(reactions.entries.joinToString(" ") { (emoji, users) -> "$emoji${users.size}" })
-    }
+    // Reaktionen hinter einer unsichtbaren Marke: der Thread zeigt sie als Chip
+    // unter der Sprechblase, Liste/Ausschnitt lassen sie weg
+    reaktionsChip(reactions)?.let { sb.append(RW_REAKTION_MARKE).append(it) }
     return sb.toString()
 }
 

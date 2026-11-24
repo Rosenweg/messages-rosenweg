@@ -355,7 +355,7 @@ class RosenwegSpeicher private constructor(context: Context) {
                 editedAt = d.editedAt,
                 deleted = d.deleted,
                 reactions = if (d.reactions.isEmpty()) null else reaktionenZuJson(d.reactions),
-                replyPreview = d.replyPreview,
+                replyPreview = zitat(chat, d),
                 mediaName = d.mediaName,
                 status = if (eigen) RwStatus.GESENDET else RwStatus.EMPFANGEN,
                 read = eigen || gelesen,
@@ -408,6 +408,27 @@ class RosenwegSpeicher private constructor(context: Context) {
     }
 
     /** Eigene Nachricht vormerken (OUTBOX), bis Broker-Bestaetigung oder Echo kommt. */
+    /** Zitat "Name: Text": die zitierte Nachricht lokal (DMs: Server kennt nur "Antwort"), sonst Vorschau */
+    private fun zitat(chat: RwChat, d: RwNachrichtDaten): String? {
+        if (d.replyPreview == null && d.replyClientMsgId == null) return null
+        val orig = d.replyClientMsgId?.let { dao.nachricht(chat.id, it) }
+        if (orig != null) return "${name(orig.senderId)}: ${vorschau(orig).take(90)}"
+        val vorschau = d.replyPreview ?: return null
+        return d.replyAbsender?.let { "${name(it)}: $vorschau" } ?: vorschau
+    }
+
+    /** Reaktionen nach Server-Stand setzen */
+    fun setzeReaktionen(rowId: Long, r: Map<String, List<String>>): Unit = synchronized(sperre) {
+        val m = dao.nachrichtZuZeile(rowId) ?: return
+        val neu = m.copy(reactions = if (r.isEmpty()) null else reaktionenZuJson(r))
+        if (neu == m) return
+        dao.aendereNachricht(neu)
+        dao.chat(m.chatId)?.let { spiegleNachricht(it, neu) }
+        refreshMessagesLokal()
+    }
+
+    private fun refreshMessagesLokal() = org.fossify.messages.helpers.refreshMessages()
+
     /** Rosenweg-Nachricht zu einer gespiegelten Fossify-ID (negativ) */
     fun nachrichtZuSpiegel(id: Long): RwMessage? = if (id < 0) dao.nachrichtZuZeile(RosenwegIds.zeile(id)) else null
 

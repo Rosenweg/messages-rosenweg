@@ -101,10 +101,27 @@ object RosenwegHooks {
 
     fun rohText(context: Context, mirrorId: Long): String? = RosenwegSpeicher.get(context).nachrichtZuSpiegel(mirrorId)?.body
 
+    /**
+     * Eigene Reaktionen – wie sie der SERVER fuer meine ID kennt (frisch aus dem Verlauf,
+     * korrigiert dabei den lokalen Stand); ohne Netz der lokale Stand.
+     */
     fun meineReaktionen(context: Context, mirrorId: Long): Set<String> {
         val s = RosenwegSpeicher.get(context)
         val ich = s.eigeneId ?: return emptySet()
         val m = s.nachrichtZuSpiegel(mirrorId) ?: return emptySet()
+        val sid = m.serverId
+        val konto = RosenwegKonto.hole(context)
+        if (sid != null && konto != null && m.clientMsgId != null) {
+            try {
+                val frisch = RosenwegApi(konto).verlauf(m.chatId, sid - 1, 1).firstOrNull { it.clientMsgId == m.clientMsgId }
+                if (frisch != null) {
+                    s.setzeReaktionen(m.rowId, frisch.reactions)
+                    return frisch.reactions.filterValues { ich in it }.keys
+                }
+            } catch (e: Exception) {
+                Log.w("RosenwegHooks", "Reaktionen vom Server", e)
+            }
+        }
         return reaktionenAusJson(m.reactions).filterValues { ich in it }.keys
     }
 

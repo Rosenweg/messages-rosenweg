@@ -160,7 +160,8 @@ abstract class BaseConversationsAdapter(
             }
 
             conversationBodyShort.apply {
-                text = smsDraft ?: conversation.snippet
+                // Rosenweg: ohne Zitat-Zeile und Reaktions-Chip
+                text = smsDraft ?: if (conversation.threadId < 0) org.fossify.messages.rosenweg.ausschnitt(conversation.snippet) else conversation.snippet
                 setTextSize(TypedValue.COMPLEX_UNIT_PX, fontSize * 0.9f)
             }
 
