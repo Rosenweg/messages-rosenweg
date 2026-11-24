@@ -49,8 +49,80 @@ object RosenwegNotfall {
             return
         }
         if (istNotfall(chat.id, d.priority)) {
+            merke(context, OffenerAlarm(chat.id, d.clientMsgId, titel, absender, d.body ?: "", System.currentTimeMillis()))
             alarm(context, titel, absender, d.body ?: "")
+            planeWiederholung(context)
         }
+    }
+
+    // ── Wiederholung bis gelesen (alle 2 min, hoechstens 60 min) ─────────
+
+    private const val PREFS = "rosenweg_notfall"
+    private const val WIEDERHOLEN_MS = 2 * 60_000L
+    private const val HOECHSTENS_MS = 60 * 60_000L
+    const val AKTION_WIEDERHOLEN = "ch.rosenweg4303.messages.NOTFALL_WIEDERHOLEN"
+
+    data class OffenerAlarm(val chatId: String, val clientMsgId: String?, val titel: String, val absender: String, val text: String, val start: Long)
+
+    /** offener Alarm ueberlebt das Schliessen der App (SharedPreferences) */
+    private fun merke(context: Context, a: OffenerAlarm) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putString("chat", a.chatId).putString("msg", a.clientMsgId).putString("titel", a.titel)
+            .putString("absender", a.absender).putString("text", a.text).putLong("start", a.start)
+            .apply()
+    }
+
+    fun offen(context: Context): OffenerAlarm? {
+        val p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val chat = p.getString("chat", null) ?: return null
+        return OffenerAlarm(chat, p.getString("msg", null), p.getString("titel", "") ?: "", p.getString("absender", "") ?: "",
+            p.getString("text", "") ?: "", p.getLong("start", 0))
+    }
+
+    private fun vergiss(context: Context) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().clear().apply()
+        try {
+            context.getSystemService(android.app.AlarmManager::class.java)?.cancel(wiederholIntent(context))
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun wiederholIntent(context: Context): PendingIntent = PendingIntent.getBroadcast(
+        context.applicationContext, 4306,
+        Intent(context.applicationContext, RosenwegNotfallReceiver::class.java).setAction(AKTION_WIEDERHOLEN),
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+
+    private fun planeWiederholung(context: Context) {
+        val am = context.getSystemService(android.app.AlarmManager::class.java) ?: return
+        val zeit = System.currentTimeMillis() + WIEDERHOLEN_MS
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !am.canScheduleExactAlarms()) {
+                am.setAndAllowWhileIdle(android.app.AlarmManager.RTC_WAKEUP, zeit, wiederholIntent(context))
+            } else {
+                am.setExactAndAllowWhileIdle(android.app.AlarmManager.RTC_WAKEUP, zeit, wiederholIntent(context))
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Wiederholung planen", e)
+        }
+    }
+
+    /** Wiederhol-Alarm (auch nach Neustart des Prozesses): erneut alarmieren, solange nicht gelesen */
+    fun wiederhole(context: Context) {
+        val app = context.applicationContext
+        val a = offen(app) ?: return
+        if (System.currentTimeMillis() - a.start > HOECHSTENS_MS) {
+            Log.i(TAG, "Notfall: 60 min ohne Quittung - Wiederholung endet")
+            vergiss(app)
+            return
+        }
+        val gelesen = a.clientMsgId?.let { RosenwegSpeicher.get(app).nachricht(a.chatId, it) }?.let { it.rcptSoll >= RwQuittung.GELESEN } == true
+        if (gelesen) {
+            vergiss(app)
+            return
+        }
+        alarm(app, a.titel, a.absender, a.text)
+        planeWiederholung(app)
     }
 
     // ── Alarm ───────────────────────────────────────────────────────────
@@ -100,18 +172,47 @@ object RosenwegNotfall {
         }
     }
 
-    /** "Verstanden" im roten Fenster: Sirene aus, Hinweis bleibt als normale Meldung. */
+    /**
+     * Quittiert = gelesen ("Verstanden" oder Notfall-Chat geoeffnet): Sirene aus,
+     * Wiederholung beendet, "read"-Quittung fuer den Notfall-Chat senden.
+     */
     fun quittieren(context: Context) {
-        Sirene.stop(context.applicationContext)
-        context.getSystemService(NotificationManager::class.java)?.cancel(NOTIF_NOTFALL)
+        val app = context.applicationContext
+        Sirene.stop(app)
+        app.getSystemService(NotificationManager::class.java)?.cancel(NOTIF_NOTFALL)
+        val a = offen(app)
+        vergiss(app)
+        letzterAlarm = null
+        Thread {
+            try {
+                val s = RosenwegSpeicher.get(app)
+                val chat = s.chat(a?.chatId ?: "notfall")
+                if (chat != null && s.quittiereGelesen(chat.threadId)) MessengerVerbindung.sendeAusstehende(app)
+            } catch (e: Exception) {
+                Log.w(TAG, "Quittung", e)
+            }
+        }.start()
+    }
+
+    /** eine eigene Lese-Quittung (auch von einem anderen eigenen Geraet) beendet den Alarm */
+    fun gelesenErkannt(context: Context, chatId: String, clientMsgId: String) {
+        val a = offen(context) ?: return
+        if (a.chatId == chatId && (a.clientMsgId == null || a.clientMsgId == clientMsgId)) {
+            Sirene.stop(context.applicationContext)
+            context.getSystemService(NotificationManager::class.java)?.cancel(NOTIF_NOTFALL)
+            vergiss(context)
+            letzterAlarm = null
+            NotfallActivity.schliesseAlle()
+        }
     }
 
     fun entwarnung(context: Context, text: String?) {
         val app = context.applicationContext
         Log.i(TAG, "Entwarnung")
-        val warAktiv = Sirene.laeuft() || letzterAlarm != null
+        val warAktiv = Sirene.laeuft() || letzterAlarm != null || offen(app) != null
         Sirene.stop(app)
         letzterAlarm = null
+        vergiss(app)
         app.getSystemService(NotificationManager::class.java)?.cancel(NOTIF_NOTFALL)
         NotfallActivity.schliesseAlle()
         if (warAktiv) Sirene.entwarnungsTon(app)
@@ -304,5 +405,20 @@ object RosenwegNotfall {
                 }
             }.start()
         }
+    }
+}
+
+/** AlarmManager-Wiederholung des Notfalls (laeuft auch, wenn die App geschlossen war) */
+class RosenwegNotfallReceiver : android.content.BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        if (intent.action != RosenwegNotfall.AKTION_WIEDERHOLEN) return
+        val fertig = goAsync()
+        Thread {
+            try {
+                RosenwegNotfall.wiederhole(context)
+            } finally {
+                fertig.finish()
+            }
+        }.start()
     }
 }

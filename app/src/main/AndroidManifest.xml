@@ -217,6 +217,10 @@
             android:exported="false" />
 
         <receiver
+            android:name=".rosenweg.RosenwegNotfallReceiver"
+            android:exported="false" />
+
+        <receiver
             android:name=".rosenweg.RosenwegStartReceiver"
             android:exported="false">
             <intent-filter>

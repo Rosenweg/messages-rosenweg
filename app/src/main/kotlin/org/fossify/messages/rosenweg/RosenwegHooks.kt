@@ -38,8 +38,10 @@ object RosenwegHooks {
     fun schreibSperre(context: Context, threadId: Long): String? {
         val chat = RosenwegSpeicher.get(context).chatZuThread(threadId) ?: return null
         return when {
-            !chat.canWrite -> TEXT_NUR_LESEN
-            else -> null
+            chat.canWrite -> null
+            chat.id == "notfall" -> "Nur Technik/Präsident können hier schreiben"
+            chat.kind == "bcast" -> "Nur Ausschuss/Technik/Präsident können hier schreiben"
+            else -> TEXT_NUR_LESEN
         }
     }
 
@@ -70,7 +72,12 @@ object RosenwegHooks {
         if (!threadId.isRosenwegThread()) return
         val app = context.applicationContext
         ensureBackgroundThread {
-            if (RosenwegSpeicher.get(app).quittiereGelesen(threadId) && MessengerVerbindung.istAktiv()) {
+            val s = RosenwegSpeicher.get(app)
+            // Notfall-Chat geoeffnet = Notfall gelesen: Sirene/Wiederholung aus
+            if (s.chatZuThread(threadId)?.id == RosenwegNotfall.offen(app)?.chatId) {
+                RosenwegNotfall.quittieren(app)
+            }
+            if (s.quittiereGelesen(threadId) && MessengerVerbindung.istAktiv()) {
                 MessengerVerbindung.sendeAusstehende(app)
             }
         }
@@ -205,6 +212,8 @@ class RosenwegStartReceiver : BroadcastReceiver() {
                 val app = context.applicationContext
                 ensureBackgroundThread {
                     try {
+                        // offener Notfall ueberlebt den Neustart (AlarmManager-Wecker gehen dabei verloren)
+                        if (RosenwegNotfall.offen(app) != null) RosenwegNotfall.wiederhole(app)
                         if (RosenwegKonto.hole(app) != null) MessengerVerbindung.starteWennKonto(app)
                     } finally {
                         ende.finish()

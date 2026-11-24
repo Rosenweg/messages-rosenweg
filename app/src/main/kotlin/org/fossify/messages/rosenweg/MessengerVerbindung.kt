@@ -341,7 +341,7 @@ class MessengerVerbindung : Service() {
                 messagesDB.deleteAllExceptRosenweg()
                 config.wasDbCleared = true
             }
-            val chats = speicher.gleicheGespraecheAb(gespraeche, pubTopics, mitglieder)
+            val chats = speicher.gleicheGespraecheAb(gespraeche, pubTopics, mitglieder, k.istAdmin)
             if (!spiegelGeprueft) {
                 // Spiegel pruefen/neu schreiben, verwaiste Rosenweg-Threads entfernen (einmal je Prozess)
                 speicher.pruefeSpiegel()
@@ -727,6 +727,9 @@ class MessengerVerbindung : Service() {
                 topic.startsWith("receipt/") -> {
                     val q = RwQuittung.parse(topic, text) ?: return
                     if (q.chatId !in chatsNachId) return
+                    if (q.userId == speicher.eigeneId && q.stufe >= RwQuittung.GELESEN) {
+                        RosenwegNotfall.gelesenErkannt(this, q.chatId, q.clientMsgId)
+                    }
                     if (speicher.nimmQuittung(q)) refreshMessages()
                 }
 

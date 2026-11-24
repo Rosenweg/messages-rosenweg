@@ -200,6 +200,8 @@ class RosenwegSpeicher private constructor(context: Context) {
 
     fun chat(id: String): RwChat? = dao.chat(id)
 
+    fun nachricht(chatId: String, clientMsgId: String): RwMessage? = dao.nachricht(chatId, clientMsgId)
+
     fun chats(): List<RwChat> = dao.chats()
 
     /** Teilnehmer eines Rosenweg-Threads (ohne sich selbst) fuer Kopfzeile/Details. */
@@ -231,6 +233,7 @@ class RosenwegSpeicher private constructor(context: Context) {
         liste: List<RwGespraechDaten>,
         pubTopics: List<String>?,
         mitgliederJeChat: Map<String, List<String>>,
+        istAdmin: Boolean = false,
     ): List<RwChat> = synchronized(sperre) {
         val ergebnis = ArrayList<RwChat>()
         for (g in liste) {
@@ -238,8 +241,10 @@ class RosenwegSpeicher private constructor(context: Context) {
             val members = (mitgliederJeChat[g.id]?.takeIf { it.isNotEmpty() } ?: g.participants.takeIf { it.isNotEmpty() })
                 ?.let { ids -> JsonArray(ids.map { JsonPrimitive(it) }).toString() }
                 ?: alt?.members
-            val kannSchreiben = pubTopics?.let { darfSchreiben(it, g.topicPrefix) }
-                ?: (g.kind != "bcast" && g.role != "readonly")
+            // wie die PWA: in Kanaelen nur Rolle publisher/admin (oder technik/präsident);
+            // zusaetzlich muss das MQTT-JWT das Schreiben erlauben
+            val rolleErlaubt = if (g.kind == "bcast") g.role == "publisher" || g.role == "admin" || istAdmin else g.role != "readonly"
+            val kannSchreiben = rolleErlaubt && (pubTopics?.let { darfSchreiben(it, g.topicPrefix) } ?: true)
             var chat = RwChat(
                 seq = alt?.seq ?: 0,
                 id = g.id,
