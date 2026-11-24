@@ -229,6 +229,22 @@
             </intent-filter>
         </receiver>
 
+        <!-- Abmelden auf dem geteilten Telefon: Messenger loescht sich selbst (Notfall-Rechte bleiben). -->
+        <receiver
+            android:name=".rosenweg.RosenwegAbmeldungReceiver"
+            android:exported="true"
+            android:permission="ch.rosenweg4303.permission.ANLAGE">
+            <intent-filter>
+                <action android:name="ch.rosenweg4303.ABGEMELDET" />
+            </intent-filter>
+        </receiver>
+
+        <provider
+            android:name=".rosenweg.RosenwegLoeschProvider"
+            android:authorities="ch.rosenweg4303.messages.rosenweg.loeschen"
+            android:exported="true"
+            android:permission="ch.rosenweg4303.permission.ANLAGE" />
+
         <!-- Anmeldung auf dem geteilten Telefon: Verbindung sofort starten (nur Rosenweg Geraet sendet). -->
         <receiver
             android:name=".rosenweg.RosenwegAnmeldungReceiver"

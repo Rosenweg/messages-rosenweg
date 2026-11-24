@@ -47,6 +47,11 @@ class RosenwegSpeicher private constructor(context: Context) {
 
         fun get(context: Context): RosenwegSpeicher =
             instanz ?: synchronized(this) { instanz ?: RosenwegSpeicher(context).also { instanz = it } }
+
+        /** Abmelden: neue Instanz (mit neuer DB) beim naechsten Zugriff */
+        fun vergiss() {
+            synchronized(this) { instanz = null }
+        }
     }
 
     data class Eingang(val chat: RwChat, val nachricht: RwMessage, val neu: Boolean, val anzeige: String, val absenderName: String)

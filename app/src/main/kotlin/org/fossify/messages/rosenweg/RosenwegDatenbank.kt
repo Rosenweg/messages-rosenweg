@@ -223,6 +223,13 @@ abstract class RosenwegDatenbank : RoomDatabase() {
         @Volatile
         private var instanz: RosenwegDatenbank? = null
 
+        /** Abmelden: schliessen, damit die Datei geloescht werden kann */
+        @Synchronized
+        fun schliesse() {
+            instanz?.close()
+            instanz = null
+        }
+
         /** Kuenftige Schemaaenderungen hier als echte Migration ergaenzen (kein destruktiver Rueckfall). */
         private val MIGRATIONEN = arrayOf<Migration>(
             object : Migration(1, 2) {

@@ -48,6 +48,14 @@ abstract class MessagesDatabase : RoomDatabase() {
     companion object {
         private var db: MessagesDatabase? = null
 
+        /** Rosenweg-Abmelden: schliessen, damit die Datei geloescht werden kann */
+        fun schliesse() {
+            synchronized(MessagesDatabase::class) {
+                db?.close()
+                db = null
+            }
+        }
+
         fun getInstance(context: Context): MessagesDatabase {
             if (db == null) {
                 synchronized(MessagesDatabase::class) {

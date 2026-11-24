@@ -1091,6 +1091,15 @@ class ThreadActivity : SimpleActivity() {
             threadCharacterCounter.beGone()
             threadSelectSimIcon.beGone()
             threadSelectSimNumber.beGone()
+            // Rosenweg: nur Foto auswählen, Foto aufnehmen, Datei (keine Sprach-/Video-
+            // nachrichten, kein Kontakt, kein geplantes Senden)
+            attachmentPicker.apply {
+                chooseVideo.beGone()
+                recordVideo.beGone()
+                recordAudio.beGone()
+                pickContact.beGone()
+                scheduleMessage.beGone()
+            }
         }
         updateMessageType()
         if (sperre != null) {

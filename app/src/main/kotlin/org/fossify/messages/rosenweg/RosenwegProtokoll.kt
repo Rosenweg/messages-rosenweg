@@ -429,7 +429,7 @@ fun wendeReaktionAn(r: Map<String, List<String>>, userId: String, emoji: String,
 
 // ── Anzeige-Text der gespiegelten Fossify-Nachricht ─────────────────────
 
-const val RW_TEXT_VERSCHLUESSELT = "🔒 Nicht entschlüsselbar"
+const val RW_TEXT_VERSCHLUESSELT = "🔒 Vor der Anmeldung an diesem Gerät verschlüsselt"
 const val RW_TEXT_GELOESCHT = "🚫 Nachricht gelöscht"
 
 fun anzeigeText(

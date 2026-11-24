@@ -31,7 +31,8 @@ object RosenwegNotfall {
     private const val KANAL_KRISE = "rosenweg_krise"
     private const val NOTIF_NOTFALL = 4304
     private const val NOTIF_KRISE = 4305
-    private const val SIRENE_MAX_MS = 3 * 60_000L
+    // je Alarm 30 s Sirene + Vibration, dann Ruhe bis zur Wiederholung (alle 2 min)
+    private const val SIRENE_MAX_MS = 30_000L
 
     private val STOPP = setOf("stop", "stopp", "entwarnung", "entwarnt", "ende", "vorbei", "aufgehoben", "alles ok", "alles gut")
 
@@ -77,6 +78,15 @@ object RosenwegNotfall {
         val chat = p.getString("chat", null) ?: return null
         return OffenerAlarm(chat, p.getString("msg", null), p.getString("titel", "") ?: "", p.getString("absender", "") ?: "",
             p.getString("text", "") ?: "", p.getLong("start", 0))
+    }
+
+    /** Abmelden: Sirene, Vibration, Wiederholung, Meldungen aus */
+    fun allesAus(context: Context) {
+        Sirene.stop(context.applicationContext)
+        vergiss(context)
+        letzterAlarm = null
+        kriseAktiv = false
+        NotfallActivity.schliesseAlle()
     }
 
     private fun vergiss(context: Context) {

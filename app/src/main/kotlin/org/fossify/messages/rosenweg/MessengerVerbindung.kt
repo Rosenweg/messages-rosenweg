@@ -103,6 +103,29 @@ class MessengerVerbindung : Service() {
 
         fun istAktiv() = laeuft
 
+        /** Abmelden: Verbindung sofort hart beenden, Arbeits-Threads stoppen (blockiert max. ~3 s). */
+        fun sofortBeenden(context: Context) {
+            instanz?.let { d ->
+                try {
+                    d.stoppePingAlarm()
+                    d.client?.abbrechen()
+                } catch (_: Exception) {
+                }
+                d.arbeiter.shutdownNow()
+                d.lader.shutdownNow()
+                try {
+                    d.arbeiter.awaitTermination(2, TimeUnit.SECONDS)
+                    d.lader.awaitTermination(1, TimeUnit.SECONDS)
+                } catch (_: InterruptedException) {
+                }
+                d.stopSelf()
+            }
+            try {
+                context.stopService(Intent(context, MessengerVerbindung::class.java))
+            } catch (_: Exception) {
+            }
+        }
+
         /** "schreibt …" an die anderen (qos 0, typing/<conv>) */
         fun tippe(chatId: String, tippt: Boolean) {
             instanz?.let { d ->
@@ -210,8 +233,10 @@ class MessengerVerbindung : Service() {
             }
         }
         stoppePingAlarm()
-        arbeiter.execute { trenne(sauber = true) }
-        arbeiter.shutdown()
+        if (!arbeiter.isShutdown) {
+            arbeiter.execute { trenne(sauber = true) }
+            arbeiter.shutdown()
+        }
         lader.shutdownNow()
         super.onDestroy()
     }
