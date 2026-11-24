@@ -551,7 +551,17 @@ object RwQuittung {
 
 // ── Geraete / Schluessel / Verlauf fuer neue Geraete ────────────────────
 
-data class RwGeraet(val deviceId: String, val pubkey: String, val lastSeen: Long?)
+data class RwGeraet(val deviceId: String, val pubkey: String, val lastSeen: Long?, val addedAt: Long? = null)
+
+/**
+ * Je Geraete-ID genau ein Schluessel: der neueste nach added_at (bei fehlendem
+ * added_at gilt der spaetere in der Antwort). Nach einer Neuanmeldung auf einem
+ * geteilten Telefon hat das Geraet dieselbe ID, aber einen neuen Schluessel.
+ */
+fun neuesteJeGeraet(liste: List<RwGeraet>): List<RwGeraet> =
+    liste.withIndex()
+        .groupBy { it.value.deviceId }
+        .map { (_, eintraege) -> eintraege.maxWith(compareBy<IndexedValue<RwGeraet>>({ it.value.addedAt ?: Long.MIN_VALUE }, { it.index })).value }
 
 /** GET /api/keys/:uid → Geraete mit ecdh-p256-Schluessel (ohne widerrufene) */
 fun parseSchluessel(text: String): List<RwGeraet> {
@@ -561,8 +571,8 @@ fun parseSchluessel(text: String): List<RwGeraet> {
         if (k["revoked_at"]?.let { it !is kotlinx.serialization.json.JsonNull } == true) return@mapNotNull null
         val alg = k.str("alg")
         if (alg != null && alg != RwKrypto.ALG) return@mapNotNull null
-        RwGeraet(k.str("device_id") ?: return@mapNotNull null, k.str("pubkey") ?: return@mapNotNull null, parseZeit(k["last_seen"]))
-    } ?: emptyList()
+        RwGeraet(k.str("device_id") ?: return@mapNotNull null, k.str("pubkey") ?: return@mapNotNull null, parseZeit(k["last_seen"]), parseZeit(k["added_at"]))
+    }?.let { neuesteJeGeraet(it) } ?: emptyList()
 }
 
 /** GET /api/link/devices → eigene Geraete */
@@ -570,8 +580,8 @@ fun parseEigeneGeraete(text: String): List<RwGeraet> {
     val o = parseJson(text) as? JsonObject ?: return emptyList()
     return o.arr("devices")?.mapNotNull { e ->
         val d = e as? JsonObject ?: return@mapNotNull null
-        RwGeraet(d.str("deviceId") ?: return@mapNotNull null, d.str("pubkey") ?: return@mapNotNull null, parseZeit(d["lastSeen"]))
-    } ?: emptyList()
+        RwGeraet(d.str("deviceId") ?: return@mapNotNull null, d.str("pubkey") ?: return@mapNotNull null, parseZeit(d["lastSeen"]), parseZeit(d["addedAt"]))
+    }?.let { neuesteJeGeraet(it) } ?: emptyList()
 }
 
 data class RwBackfillEintrag(val convId: String, val origMsgId: Long, val ciphertext: String)

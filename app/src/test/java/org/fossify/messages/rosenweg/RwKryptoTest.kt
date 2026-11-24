@@ -108,3 +108,16 @@ class NotfallRegelnTest {
         org.junit.Assert.assertFalse(RosenwegNotfall.istNotfall("ankuendigungen", null))
     }
 }
+
+class SchluesselAuswahlTest {
+    @org.junit.Test
+    fun neuesterJeGeraetNachAddedAt() {
+        val json = """{"userId":"7","keys":[
+          {"device_id":"dev_a","alg":"ecdh-p256-aesgcm-v1","pubkey":"NEU","added_at":"2026-11-24T22:00:00Z"},
+          {"device_id":"dev_a","alg":"ecdh-p256-aesgcm-v1","pubkey":"ALT","added_at":"2026-11-20T10:00:00Z"},
+          {"device_id":"dev_b","alg":"ecdh-p256-aesgcm-v1","pubkey":"B","added_at":"2026-11-21T10:00:00Z"},
+          {"device_id":"dev_x","alg":"x25519","pubkey":"X"}]}"""
+        val k = parseSchluessel(json).associate { it.deviceId to it.pubkey }
+        org.junit.Assert.assertEquals(mapOf("dev_a" to "NEU", "dev_b" to "B"), k)
+    }
+}

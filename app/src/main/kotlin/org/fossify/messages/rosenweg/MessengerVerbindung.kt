@@ -447,6 +447,9 @@ class MessengerVerbindung : Service() {
         filter.add(RosenwegTopics.KRISE)
         filter.add("presence/#")
         filter.add("inbox/${k.userId}")
+        // eigene Schluesselaenderungen (Server kuendigt sie hier an); fuer DM-Partner
+        // erlaubt das JWT kein Abo – deren Schluessel werden vor dem Senden frisch geholt
+        filter.add("keys/${k.userId}")
         for (chat in chatsNachId.values) {
             filter.add(RosenwegTopics.empfangsFilter(chat.topicPrefix))
             filter.add(RosenwegTopics.control(chat.id))
@@ -634,10 +637,10 @@ class MessengerVerbindung : Service() {
         }
     }
 
-    /** Geraeteschluessel eines Benutzers (5 min zwischengespeichert). */
+    /** Geraeteschluessel eines Benutzers (hoechstens 1 min zwischengespeichert, neuester je Geraet). */
     private fun geraeteVon(userId: String): List<RwGeraet> {
         val jetzt = System.currentTimeMillis()
-        schluesselCache[userId]?.takeIf { jetzt - it.first < 5 * 60_000 }?.let { return it.second }
+        schluesselCache[userId]?.takeIf { jetzt - it.first < 60_000 }?.let { return it.second }
         val k = konto ?: return emptyList()
         val liste = RosenwegApi(k).schluessel(userId)
         schluesselCache[userId] = jetzt to liste
@@ -752,6 +755,11 @@ class MessengerVerbindung : Service() {
                     Log.i(TAG, "inbox: $text")
                     inboxGeplant?.cancel(false)
                     inboxGeplant = arbeiter.schedule({ verbinde() }, 1500, TimeUnit.MILLISECONDS)
+                }
+
+                topic.startsWith("keys/") -> {
+                    Log.i(TAG, "Schluesselaenderung: $topic")
+                    schluesselCache.clear()
                 }
 
                 topic.startsWith("presence/") -> RosenwegLive.nimmPraesenz(topic, text)
@@ -874,6 +882,10 @@ class MessengerVerbindung : Service() {
             val nutzlast = if (chat.kind == "dm") {
                 // E2E: fuer alle Geraete des Gegenuebers und alle eigenen (auch dieses)
                 val partner = speicher.dmPartner(chat)
+                // vor jeder DM frisch: ein veralteter Schluessel (Neuanmeldung des Gegenuebers)
+                // ergaebe eine fuer ihn unlesbare Nachricht
+                partner?.let { schluesselCache.remove(it) }
+                schluesselCache.remove(ich)
                 val ziele = try {
                     val fremde = partner?.let { geraeteVon(it) } ?: emptyList()
                     if (fremde.isEmpty()) {
