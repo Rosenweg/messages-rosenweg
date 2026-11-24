@@ -70,6 +70,8 @@ import org.fossify.messages.models.Conversation
 import org.fossify.messages.models.Events
 import org.fossify.messages.models.Message
 import org.fossify.messages.models.SearchResult
+import org.fossify.messages.rosenweg.MessengerVerbindung
+import org.fossify.messages.rosenweg.isRosenwegThread
 import org.greenrobot.eventbus.EventBus
 import org.greenrobot.eventbus.Subscribe
 import org.greenrobot.eventbus.ThreadMode
@@ -108,6 +110,10 @@ class MainActivity : SimpleActivity() {
 
     override fun onResume() {
         super.onResume()
+        // Rosenweg Messenger: Verbindung starten, falls die Geraete-App einen Zugang liefert
+        if (!MessengerVerbindung.istAktiv()) {
+            MessengerVerbindung.starteWennKonto(this)
+        }
         updateMenuColors()
         refreshMenuItems()
 
@@ -331,7 +337,8 @@ class MainActivity : SimpleActivity() {
 
                 val isTemporaryThread = cachedConversation.isScheduled
                 val isConversationDeleted = !conversations.map { it.threadId }.contains(threadId)
-                if (isConversationDeleted && !isTemporaryThread) {
+                // Rosenweg-Chats (negative Thread-ID) stehen nie im Telephony-Provider
+                if (isConversationDeleted && !isTemporaryThread && !threadId.isRosenwegThread()) {
                     conversationsDB.deleteThreadId(threadId)
                 }
 

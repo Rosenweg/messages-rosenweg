@@ -153,5 +153,8 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.bundles.room)
     ksp(libs.androidx.room.compiler)
+    // Rosenweg Messenger: MQTT ueber WSS
+    implementation(libs.paho.mqtt)
+    testImplementation(libs.junit)
     detektPlugins(libs.compose.detekt)
 }

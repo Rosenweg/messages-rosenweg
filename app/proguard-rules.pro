@@ -44,3 +44,8 @@
 -keepclassmembers,allowobfuscation class ezvcard.parameter.* extends ezvcard.parameter.MediaTypeParameter {
     <init>(java.lang.String, java.lang.String, java.lang.String);
 }
+
+# Rosenweg Messenger: Paho MQTT laedt Netzwerkmodule per ServiceLoader und
+# Meldungstexte per ResourceBundle (Reflexion) - ganz behalten.
+-keep class org.eclipse.paho.client.mqttv3.** { *; }
+-dontwarn org.eclipse.paho.client.mqttv3.**

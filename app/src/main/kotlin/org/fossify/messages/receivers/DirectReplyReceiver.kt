@@ -15,6 +15,8 @@ import org.fossify.messages.helpers.REPLY
 import org.fossify.messages.helpers.THREAD_ID
 import org.fossify.messages.helpers.THREAD_NUMBER
 import org.fossify.messages.messaging.sendMessageCompat
+import org.fossify.messages.rosenweg.RosenwegHooks
+import org.fossify.messages.rosenweg.isRosenwegThread
 
 class DirectReplyReceiver : BroadcastReceiver() {
     @SuppressLint("MissingPermission")
@@ -24,6 +26,35 @@ class DirectReplyReceiver : BroadcastReceiver() {
         var body = RemoteInput.getResultsFromIntent(intent)?.getCharSequence(REPLY)?.toString() ?: return
 
         body = context.removeDiacriticsIfNeeded(body)
+
+        // Rosenweg-Thread: ueber MQTT senden statt SMS
+        if (threadId.isRosenwegThread()) {
+            val pending = goAsync()
+            val text = body
+            ensureBackgroundThread {
+                try {
+                    val gesendet = RosenwegHooks.sende(context, threadId, text)
+                    if (gesendet) {
+                        context.markThreadMessagesRead(threadId)
+                        Handler(Looper.getMainLooper()).post {
+                            context.notificationHelper.showMessageNotification(
+                                messageId = 0L,
+                                isMms = false,
+                                address = address ?: "",
+                                body = text,
+                                threadId = threadId,
+                                bitmap = null,
+                                sender = null,
+                                alertOnlyOnce = true
+                            )
+                        }
+                    }
+                } finally {
+                    pending.finish()
+                }
+            }
+            return
+        }
 
         if (address != null) {
             var subscriptionId: Int? = null

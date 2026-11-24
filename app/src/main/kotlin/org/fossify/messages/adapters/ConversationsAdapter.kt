@@ -25,6 +25,7 @@ import org.fossify.messages.extensions.updateConversationArchivedStatus
 import org.fossify.messages.helpers.refreshConversations
 import org.fossify.messages.messaging.isShortCodeWithLetters
 import org.fossify.messages.models.Conversation
+import org.fossify.messages.rosenweg.isRosenwegThread
 
 class ConversationsAdapter(
     activity: SimpleActivity,
@@ -40,16 +41,19 @@ class ConversationsAdapter(
         val selectedConversation = selectedItems.firstOrNull() ?: return
         val isGroupConversation = selectedConversation.isGroupConversation
         val archiveAvailable = activity.config.isArchiveAvailable
+        // Rosenweg-Chats: keine Telefonnummer → Sperren/Anrufen/Kopieren/Kontakt ausblenden
+        val anyRosenweg = selectedItems.any { it.threadId.isRosenwegThread() }
 
         menu.apply {
             findItem(R.id.cab_block_number).title =
                 activity.getString(org.fossify.commons.R.string.block_number)
+            findItem(R.id.cab_block_number).isVisible = !anyRosenweg
             findItem(R.id.cab_add_number_to_contact).isVisible =
-                isSingleSelection && !isGroupConversation
+                isSingleSelection && !isGroupConversation && !anyRosenweg
             findItem(R.id.cab_dial_number).isVisible =
-                isSingleSelection && !isGroupConversation &&
+                isSingleSelection && !isGroupConversation && !anyRosenweg &&
                         !isShortCodeWithLetters(selectedConversation.phoneNumber)
-            findItem(R.id.cab_copy_number).isVisible = isSingleSelection && !isGroupConversation
+            findItem(R.id.cab_copy_number).isVisible = isSingleSelection && !isGroupConversation && !anyRosenweg
             findItem(R.id.cab_rename_conversation).isVisible =
                 isSingleSelection && isGroupConversation
             findItem(R.id.cab_conversation_details).isVisible = isSingleSelection

@@ -196,6 +196,8 @@ import org.fossify.messages.models.ThreadItem.ThreadDateTime
 import org.fossify.messages.models.ThreadItem.ThreadError
 import org.fossify.messages.models.ThreadItem.ThreadSending
 import org.fossify.messages.models.ThreadItem.ThreadSent
+import org.fossify.messages.rosenweg.RosenwegHooks
+import org.fossify.messages.rosenweg.isRosenwegThread
 import org.greenrobot.eventbus.EventBus
 import org.greenrobot.eventbus.Subscribe
 import org.greenrobot.eventbus.ThreadMode
@@ -229,6 +231,9 @@ class ThreadActivity : SimpleActivity() {
     private lateinit var scheduledDateTime: DateTime
 
     private var isAttachmentPickerVisible = false
+
+    /** Rosenweg-Chat (negative Thread-ID): kein SMS, Senden ueber MQTT */
+    private val isRosenweg get() = threadId.isRosenwegThread()
 
     private val binding by viewBinding(ActivityThreadBinding::inflate)
 
@@ -366,17 +371,17 @@ class ThreadActivity : SimpleActivity() {
             findItem(R.id.conversation_details).isVisible = conversation != null && !isRecycleBin
             findItem(R.id.block_number).title =
                 getString(org.fossify.commons.R.string.block_number)
-            findItem(R.id.block_number).isVisible = !isRecycleBin
+            findItem(R.id.block_number).isVisible = !isRecycleBin && !isRosenweg
             findItem(R.id.dial_number).isVisible =
-                participants.size == 1 && !isSpecialNumber() && !isRecycleBin
-            findItem(R.id.manage_people).isVisible = !isSpecialNumber() && !isRecycleBin
+                participants.size == 1 && !isSpecialNumber() && !isRecycleBin && !isRosenweg
+            findItem(R.id.manage_people).isVisible = !isSpecialNumber() && !isRecycleBin && !isRosenweg
             findItem(R.id.mark_as_unread).isVisible = threadItems.isNotEmpty() && !isRecycleBin
 
             // allow saving number in cases when we don't have it stored yet
             findItem(R.id.add_number_to_contact).isVisible =
-                participants.size == 1 && participants.first().name == firstPhoneNumber && !isRecycleBin
+                participants.size == 1 && participants.first().name == firstPhoneNumber && !isRecycleBin && !isRosenweg
             findItem(R.id.copy_number).isVisible =
-                participants.size == 1 && !firstPhoneNumber.isNullOrEmpty() && !isRecycleBin
+                participants.size == 1 && !firstPhoneNumber.isNullOrEmpty() && !isRecycleBin && !isRosenweg
         }
     }
 
@@ -601,7 +606,9 @@ class ThreadActivity : SimpleActivity() {
 
             binding.threadMessagesList.adapter = currAdapter
         }
-        return currAdapter as ThreadAdapter
+        (currAdapter as ThreadAdapter).showSenderNames =
+            isRosenweg && conversation?.isGroupConversation != false
+        return currAdapter
     }
 
     private fun setupAdapter() {
@@ -879,7 +886,7 @@ class ThreadActivity : SimpleActivity() {
             }
 
             threadSendMessage.setOnLongClickListener {
-                if (!isScheduledMessage) {
+                if (!isScheduledMessage && !isRosenweg) {
                     launchScheduleSendDialog()
                 }
                 true
@@ -1022,6 +1029,14 @@ class ThreadActivity : SimpleActivity() {
     }
 
     private fun setupParticipants() {
+        if (isRosenweg) {
+            if (participants.isEmpty()) {
+                participants = RosenwegHooks.teilnehmer(this, threadId)
+            }
+            val sperre = RosenwegHooks.schreibSperre(this, threadId)
+            runOnUiThread { setupRosenwegCompose(sperre) }
+            return
+        }
         if (participants.isEmpty()) {
             participants = if (messages.isEmpty()) {
                 val intentNumbers = getPhoneNumbersFromIntent()
@@ -1033,6 +1048,34 @@ class ThreadActivity : SimpleActivity() {
             runOnUiThread {
                 maybeDisableShortCodeReply()
             }
+        }
+    }
+
+    /** Rosenweg: SMS-Bedienelemente aus, Eingabe ggf. gesperrt (DM folgt in Schritt 3, Nur-Lesen-Kanal). */
+    private fun setupRosenwegCompose(sperre: String?) {
+        if (isRecycleBin) return
+        binding.messageHolder.apply {
+            threadCharacterCounter.beGone()
+            threadSelectSimIcon.beGone()
+            threadSelectSimNumber.beGone()
+            threadAddAttachment.beGone()
+        }
+        updateMessageType()
+        if (sperre != null) {
+            currentFocus?.clearFocus()
+            hideKeyboard()
+            binding.messageHolder.root.beGone()
+            binding.shortCodeHolder.root.beVisible()
+            val textColor = getProperTextColor()
+            binding.shortCodeHolder.replyDisabledText.text = sperre
+            binding.shortCodeHolder.replyDisabledText.setTextColor(textColor)
+            binding.shortCodeHolder.replyDisabledInfo.apply {
+                applyColorFilter(textColor)
+                setOnClickListener { toast(sperre) }
+            }
+        } else {
+            binding.shortCodeHolder.root.beGone()
+            binding.messageHolder.root.beVisible()
         }
     }
 
@@ -1074,6 +1117,7 @@ class ThreadActivity : SimpleActivity() {
 
     @SuppressLint("MissingPermission")
     private fun setupSIMSelector() {
+        if (isRosenweg) return
         val availableSIMs = subscriptionManagerCompat().activeSubscriptionInfoList ?: return
         if (availableSIMs.size > 1) {
             availableSIMs.forEachIndexed { index, subscriptionInfo ->
@@ -1592,6 +1636,11 @@ class ThreadActivity : SimpleActivity() {
 
         text = removeDiacriticsIfNeeded(text)
 
+        if (isRosenweg) {
+            sendRosenwegMessage(text)
+            return
+        }
+
         val subscriptionId = availableSIMCards.getOrNull(currentSIMCardIndex)?.subscriptionId
             ?: SmsManager.getDefaultSmsSubscriptionId()
 
@@ -1694,6 +1743,19 @@ class ThreadActivity : SimpleActivity() {
             showErrorToast(
                 e.localizedMessage ?: getString(org.fossify.commons.R.string.unknown_error_occurred)
             )
+        }
+    }
+
+    private fun sendRosenwegMessage(text: String) {
+        if (text.isBlank()) return
+        val rwThreadId = threadId
+        clearCurrentMessage()
+        ensureBackgroundThread {
+            if (!RosenwegHooks.sende(this, rwThreadId, text)) {
+                runOnUiThread {
+                    binding.messageHolder.threadTypeMessage.setText(text)
+                }
+            }
         }
     }
 
@@ -1869,7 +1931,8 @@ class ThreadActivity : SimpleActivity() {
         val messageSnapshot = messages.toSortedMessages()
         val lastMaxId = messageSnapshot.filterNot { it.isScheduled }.maxByOrNull { it.id }?.id ?: 0L
         val providerParticipantsChanged = reconcileProviderParticipants()
-        val newThreadId = getThreadId(participants.getAddresses().toSet())
+        // Rosenweg-Threads haben keine Telephony-Thread-ID
+        val newThreadId = if (isRosenweg) threadId else getThreadId(participants.getAddresses().toSet())
         val newMessages = getMessages(newThreadId, includeScheduledMessages = false)
         if (messageSnapshot.isNotEmpty() && messageSnapshot.all { it.isScheduled } && newMessages.isNotEmpty()) {
             // update scheduled messages with real thread id
@@ -1911,6 +1974,10 @@ class ThreadActivity : SimpleActivity() {
     }
 
     private fun updateMessageType() {
+        if (isRosenweg) {
+            binding.messageHolder.threadSendMessage.text = ""
+            return
+        }
         val text = binding.messageHolder.threadTypeMessage.text.toString()
         val stringId = if (isMmsMessage(text)) {
             R.string.mms

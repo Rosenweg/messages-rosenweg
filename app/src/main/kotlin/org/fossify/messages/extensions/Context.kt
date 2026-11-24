@@ -57,6 +57,8 @@ import org.fossify.messages.helpers.FILE_SIZE_NONE
 import org.fossify.messages.helpers.MAX_MESSAGE_LENGTH
 import org.fossify.messages.helpers.MESSAGES_LIMIT
 import org.fossify.messages.helpers.MessagingCache
+import org.fossify.messages.rosenweg.RosenwegHooks
+import org.fossify.messages.rosenweg.isRosenwegThread
 import org.fossify.messages.helpers.NotificationHelper
 import org.fossify.messages.helpers.ShortcutHelper
 import org.fossify.messages.helpers.generateRandomId
@@ -117,6 +119,10 @@ fun Context.getMessages(
     includeScheduledMessages: Boolean = true,
     limit: Int = MESSAGES_LIMIT,
 ): ArrayList<Message> {
+    // Rosenweg: Chats liegen nur im Spiegel der Fossify-DB
+    if (threadId.isRosenwegThread()) {
+        return RosenwegHooks.nachrichten(this, threadId, dateFrom, limit)
+    }
     val uri = Sms.CONTENT_URI
     val projection = arrayOf(
         Sms._ID,
@@ -352,6 +358,9 @@ fun Context.getConversations(
     threadId: Long? = null,
     privateContacts: ArrayList<SimpleContact> = ArrayList(),
 ): ArrayList<Conversation> {
+    if (threadId != null && threadId.isRosenwegThread()) {
+        return RosenwegHooks.conversation(this, threadId)?.let { arrayListOf(it) } ?: ArrayList()
+    }
     val archiveAvailable = config.isArchiveAvailable
 
     val uri = "${Threads.CONTENT_URI}?simple=true".toUri()
@@ -622,6 +631,9 @@ fun Context.getThreadParticipants(
     threadId: Long,
     contactsMap: HashMap<Int, SimpleContact>?,
 ): ArrayList<SimpleContact> {
+    if (threadId.isRosenwegThread()) {
+        return RosenwegHooks.teilnehmer(this, threadId)
+    }
     val recipientIds = getThreadRecipientIds(threadId)
     val phoneNumbers = getThreadPhoneNumbers(recipientIds)
     MessagingCache.participantsCache.get(threadId, phoneNumbers)?.let {
@@ -863,6 +875,14 @@ fun Context.removeAllArchivedConversations(callback: (() -> Unit)? = null) {
 }
 
 fun Context.deleteConversation(threadId: Long) {
+    if (threadId.isRosenwegThread()) {
+        // nur lokal: Verlauf weg, das Gespraech selbst kommt beim naechsten Abgleich leer zurueck
+        RosenwegHooks.gespraechGeloescht(this, threadId)
+        conversationsDB.deleteThreadId(threadId)
+        messagesDB.deleteThreadMessages(threadId)
+        notificationManager.cancel(threadId.hashCode())
+        return
+    }
     var uri = Sms.CONTENT_URI
     val selection = "${Sms.THREAD_ID} = ?"
     val selectionArgs = arrayOf(threadId.toString())
@@ -947,6 +967,10 @@ fun Context.restoreMessageFromRecycleBin(id: Long) {
 }
 
 fun Context.updateConversationArchivedStatus(threadId: Long, archived: Boolean) {
+    if (threadId.isRosenwegThread()) {
+        if (archived) conversationsDB.moveToArchive(threadId) else conversationsDB.unarchive(threadId)
+        return
+    }
     val uri = Threads.CONTENT_URI
     val values = ContentValues().apply {
         put(Threads.ARCHIVED, archived)
@@ -974,6 +998,16 @@ fun Context.updateConversationArchivedStatus(threadId: Long, archived: Boolean) 
 }
 
 fun Context.deleteMessage(id: Long, isMMS: Boolean) {
+    if (id < 0) {
+        // Rosenweg-Nachricht: nur lokal loeschen
+        try {
+            RosenwegHooks.nachrichtGeloescht(this, id)
+            messagesDB.delete(id)
+        } catch (e: Exception) {
+            showErrorToast(e)
+        }
+        return
+    }
     val uri = if (isMMS) Mms.CONTENT_URI else Sms.CONTENT_URI
     val selection = "${Sms._ID} = ?"
     val selectionArgs = arrayOf(id.toString())
@@ -994,6 +1028,11 @@ fun Context.deleteScheduledMessage(messageId: Long) {
 }
 
 fun Context.markMessageRead(id: Long, isMMS: Boolean) {
+    if (id < 0) {
+        RosenwegHooks.markiereGelesen(this, id)
+        messagesDB.markRead(id)
+        return
+    }
     val uri = if (isMMS) Mms.CONTENT_URI else Sms.CONTENT_URI
     val contentValues = ContentValues().apply {
         put(Sms.READ, 1)
@@ -1006,6 +1045,12 @@ fun Context.markMessageRead(id: Long, isMMS: Boolean) {
 }
 
 fun Context.markThreadMessagesRead(threadId: Long) {
+    if (threadId.isRosenwegThread()) {
+        RosenwegHooks.markiereThreadGelesen(this, threadId)
+        messagesDB.markThreadRead(threadId)
+        conversationsDB.markRead(threadId)
+        return
+    }
     val id = threadId.toString()
 
     val smsValues = ContentValues().apply {
@@ -1029,6 +1074,10 @@ fun Context.markThreadMessagesRead(threadId: Long) {
 }
 
 fun Context.markThreadMessagesUnread(threadId: Long) {
+    if (threadId.isRosenwegThread()) {
+        conversationsDB.markUnread(threadId)
+        return
+    }
     arrayOf(Sms.CONTENT_URI, Mms.CONTENT_URI).forEach { uri ->
         val contentValues = ContentValues().apply {
             put(Sms.READ, 0)

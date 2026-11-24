@@ -4,6 +4,9 @@ import android.annotation.SuppressLint
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
+import android.text.SpannableStringBuilder
+import android.text.Spanned
+import android.text.style.StyleSpan
 import android.graphics.drawable.Drawable
 import android.util.TypedValue
 import android.view.Menu
@@ -100,6 +103,9 @@ class ThreadAdapter(
     val deleteMessages: (messages: List<Message>, toRecycleBin: Boolean, fromRecycleBin: Boolean) -> Unit
 ) : MyRecyclerViewListAdapter<ThreadItem>(activity, recyclerView, ThreadItemDiffCallback(), itemClick) {
     private var fontSize = activity.getTextSize()
+
+    /** Rosenweg-Gruppen/-Kanaele: Absendername ueber eingehenden Nachrichten zeigen */
+    var showSenderNames = false
 
     @SuppressLint("MissingPermission")
     private val hasMultipleSIMCards = (activity.subscriptionManagerCompat().activeSubscriptionInfoList?.size ?: 0) > 1
@@ -370,7 +376,15 @@ class ThreadAdapter(
         ItemMessageBinding.bind(view).apply {
             threadMessageHolder.isSelected = selectedKeys.contains(message.getSelectionKey())
             threadMessageBody.apply {
-                text = message.body
+                text = if (showSenderNames && message.isReceivedMessage() && message.senderName.isNotEmpty()) {
+                    SpannableStringBuilder().apply {
+                        append(message.senderName, StyleSpan(Typeface.BOLD), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                        append('\n')
+                        append(message.body)
+                    }
+                } else {
+                    message.body
+                }
                 setTextSize(TypedValue.COMPLEX_UNIT_PX, fontSize)
                 beVisibleIf(message.body.isNotEmpty())
                 setOnLongClickListener {

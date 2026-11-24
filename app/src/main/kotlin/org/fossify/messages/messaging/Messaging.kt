@@ -17,6 +17,7 @@ import org.fossify.messages.messaging.SmsException.Companion.EMPTY_DESTINATION_A
 import org.fossify.messages.messaging.SmsException.Companion.ERROR_PERSISTING_MESSAGE
 import org.fossify.messages.messaging.SmsException.Companion.ERROR_SENDING_MESSAGE
 import org.fossify.messages.models.Attachment
+import org.fossify.messages.rosenweg.isRosenwegAdresse
 
 @Deprecated("TODO: Move/rewrite messaging config code into the app.")
 fun Context.getSendMessageSettings(): Settings {
@@ -101,6 +102,8 @@ fun Context.sendMessageCompat(
             showErrorToast(e)
         }
     }
+    // Rosenweg: rw:-Adressen gehoeren nie in die Telephony-Threads
+    if (addresses.any { it.isRosenwegAdresse() }) return
     ensureBackgroundThread {
         val threadId = getThreadId(addresses.toSet())
         shortcutHelper.reportSendMessageUsage(threadId)
@@ -113,6 +116,8 @@ fun Context.sendMessageCompat(
  * contains outdated information regarding max number of digits. The exact parameters for short codes can vary by country and by carrier.
  */
 fun isShortCodeWithLetters(address: String): Boolean {
+    // Rosenweg-Adressen (rw:<id>) sind keine Kurznummern; Antworten ist erlaubt
+    if (address.isRosenwegAdresse()) return false
     if (Patterns.EMAIL_ADDRESS.matcher(address).matches()) {
         // emails are not short codes: https://github.com/FossifyOrg/Messages/issues/115
         return false
