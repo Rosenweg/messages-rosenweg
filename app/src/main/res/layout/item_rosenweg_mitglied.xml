@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_vertical"
+    android:minHeight="56dp"
+    android:orientation="horizontal"
+    android:paddingStart="@dimen/activity_margin"
+    android:paddingTop="@dimen/small_margin"
+    android:paddingEnd="@dimen/medium_margin"
+    android:paddingBottom="@dimen/small_margin">
+
+    <ImageView
+        android:id="@+id/mitglied_bild"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:contentDescription="@null" />
+
+    <TextView
+        android:id="@+id/mitglied_name"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/activity_margin"
+        android:layout_weight="1"
+        android:ellipsize="end"
+        android:maxLines="2"
+        tools:text="Anna Muster (du)" />
+
+    <Spinner
+        android:id="@+id/mitglied_rolle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:visibility="gone"
+        tools:visibility="visible" />
+
+    <TextView
+        android:id="@+id/mitglied_rolle_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:alpha="0.7"
+        android:visibility="gone"
+        tools:text="Mitglied"
+        tools:visibility="visible" />
+
+    <ImageView
+        android:id="@+id/mitglied_entfernen"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:contentDescription="Entfernen"
+        android:padding="10dp"
+        android:src="@drawable/ic_cross_vector"
+        android:visibility="gone"
+        tools:visibility="visible" />
+
+</LinearLayout>

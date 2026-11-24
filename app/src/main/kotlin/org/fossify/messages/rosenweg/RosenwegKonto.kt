@@ -20,6 +20,10 @@ data class RosenwegKonto(
     /** Anzeigename aus dem Anlage-Token (Claim "name") */
     val name: String? = null,
 ) {
+    /** wie requireAuth im message-store: technik / präsident verwalten alle Gespraeche */
+    val istAdmin: Boolean
+        get() = leseJwt(token)?.groups?.any { it.lowercase() in setOf("technik", "präsident", "praesident") } == true
+
     fun laeuftBaldAb(jetzt: Long = System.currentTimeMillis()) = gueltigBisMs - jetzt < ERNEUERN_VOR_MS
 
     companion object {

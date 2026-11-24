@@ -54,8 +54,9 @@ class ConversationsAdapter(
                 isSingleSelection && !isGroupConversation && !anyRosenweg &&
                         !isShortCodeWithLetters(selectedConversation.phoneNumber)
             findItem(R.id.cab_copy_number).isVisible = isSingleSelection && !isGroupConversation && !anyRosenweg
+            // Rosenweg: Umbenennen ueber die Gruppen-Info (fuer alle Mitglieder)
             findItem(R.id.cab_rename_conversation).isVisible =
-                isSingleSelection && isGroupConversation
+                isSingleSelection && isGroupConversation && !anyRosenweg
             findItem(R.id.cab_conversation_details).isVisible = isSingleSelection
             findItem(R.id.cab_mark_as_read).isVisible = selectedItems.any { !it.read }
             findItem(R.id.cab_mark_as_unread).isVisible = selectedItems.any { it.read }

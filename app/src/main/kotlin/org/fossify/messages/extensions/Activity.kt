@@ -1,5 +1,6 @@
 package org.fossify.messages.extensions
 
+import org.fossify.messages.rosenweg.isRosenwegThread
 import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Intent
@@ -111,6 +112,11 @@ fun Activity.startContactDetailsIntent(contact: SimpleContact) {
 }
 
 fun Activity.launchConversationDetails(threadId: Long) {
+    // Rosenweg-Chats: Gruppen-/Kontakt-Info wie in der PWA
+    if (threadId.isRosenwegThread()) {
+        org.fossify.messages.rosenweg.RosenwegGruppeActivity.starte(this, threadId)
+        return
+    }
     Intent(this, ConversationDetailsActivity::class.java).apply {
         putExtra(THREAD_ID, threadId)
         startActivity(this)

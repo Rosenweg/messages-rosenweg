@@ -368,7 +368,7 @@ class ThreadActivity : SimpleActivity() {
             findItem(R.id.unarchive).isVisible =
                 threadItems.isNotEmpty() && conversation?.isArchived == true && !isRecycleBin && archiveAvailable
             findItem(R.id.rename_conversation).isVisible =
-                participants.size > 1 && conversation != null && !isRecycleBin
+                participants.size > 1 && conversation != null && !isRecycleBin && !isRosenweg
             findItem(R.id.conversation_details).isVisible = conversation != null && !isRecycleBin
             findItem(R.id.block_number).title =
                 getString(org.fossify.commons.R.string.block_number)
@@ -387,6 +387,10 @@ class ThreadActivity : SimpleActivity() {
     }
 
     private fun setupOptionsMenu() {
+        // Rosenweg: Titel antippen oeffnet die Gruppen-/Kontakt-Info (wie in der PWA)
+        binding.threadToolbar.setOnClickListener {
+            if (isRosenweg && !isRecycleBin) launchConversationDetails(threadId)
+        }
         binding.threadToolbar.setOnMenuItemClickListener { menuItem ->
             if (participants.isEmpty()) return@setOnMenuItemClickListener true
             return@setOnMenuItemClickListener handleMenuItemAction(menuItem)

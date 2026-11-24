@@ -102,6 +102,13 @@ class RosenwegSpeicher private constructor(context: Context) {
 
     fun mitgliederIds(chat: RwChat): List<String> = mitglieder(chat)
 
+    /** Verzeichnis ohne sich selbst, nach Namen sortiert (fuer "Hinzufügen") */
+    fun personenListe(): List<RwUser> = personen().values.filter { it.id != eigeneId }.sortedBy { it.name.lowercase() }
+
+    /** Geteilte Medien eines Chats (neueste zuerst) */
+    fun medien(chatId: String): List<RwMessage> =
+        dao.nachrichten(chatId).filter { it.mediaName != null && !it.deleted }.reversed()
+
     // ── E2E: Verlauf von anderen Geraeten, nachtraegliches Entschluesseln ──
 
     fun speichereBackfill(eintraege: List<RwBackfillEintrag>): Unit = synchronized(sperre) {

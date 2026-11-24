@@ -124,6 +124,8 @@ data class JwtAngaben(
     val exp: Long?,
     val pubTopics: List<String>,
     val subTopics: List<String>,
+    /** Gruppen aus dem Anlage-Token (technik/praesident = Verwaltung aller Chats) */
+    val groups: List<String> = emptyList(),
 )
 
 /** Liest die Nutzlast eines JWT (ohne Pruefung der Signatur - das macht der Server). */
@@ -144,6 +146,7 @@ fun leseJwt(token: String): JwtAngaben? {
         exp = o.lng("exp"),
         pubTopics = liste("pub_topics"),
         subTopics = liste("sub_topics"),
+        groups = liste("groups"),
     )
 }
 
