@@ -288,13 +288,14 @@ fun baueAusgehendDm(senderId: String, clientMsgId: String, ts: Long, buendel: St
         replyTo?.let { parseJson(it) }?.let { put("replyTo", it) }
     }.toString()
 
-fun baueAusgehend(senderId: String, clientMsgId: String, ts: Long, body: String, replyTo: String? = null): String =
+fun baueAusgehend(senderId: String, clientMsgId: String, ts: Long, body: String, replyTo: String? = null, media: String? = null): String =
     buildJsonObject {
         put("senderId", senderId)
         put("clientMsgId", clientMsgId)
         put("ts", ts)
         put("body", body)
         replyTo?.let { parseJson(it) }?.let { put("replyTo", it) }
+        media?.let { parseJson(it) }?.let { put("media", it) }
     }.toString()
 
 /**

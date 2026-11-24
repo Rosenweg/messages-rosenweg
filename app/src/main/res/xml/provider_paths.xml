@@ -2,4 +2,6 @@
 <paths>
     <cache-path name="compressed_files" path="compressed/"/>
     <cache-path name="attachment_files" path="attachments/"/>
+    <!-- Rosenweg Messenger: heruntergeladene/entschluesselte Medien -->
+    <files-path name="rosenweg_medien" path="rosenweg_medien/"/>
 </paths>

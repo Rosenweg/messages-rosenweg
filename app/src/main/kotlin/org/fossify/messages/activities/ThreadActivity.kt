@@ -1073,7 +1073,6 @@ class ThreadActivity : SimpleActivity() {
             threadCharacterCounter.beGone()
             threadSelectSimIcon.beGone()
             threadSelectSimNumber.beGone()
-            threadAddAttachment.beGone()
         }
         updateMessageType()
         if (sperre != null) {
@@ -1855,15 +1854,26 @@ class ThreadActivity : SimpleActivity() {
     }
 
     private fun sendRosenwegMessage(text: String) {
-        if (text.isBlank()) return
+        val anhaenge = getAttachmentSelections().filter { !it.isPending }
+        if (text.isBlank() && anhaenge.isEmpty()) return
         val rwThreadId = threadId
         val antwort = rwAntwortAuf
         clearCurrentMessage()
         beendeAntwort()
         ensureBackgroundThread {
-            if (!RosenwegHooks.sende(this, rwThreadId, text, antwort)) {
-                runOnUiThread {
-                    binding.messageHolder.threadTypeMessage.setText(text)
+            if (anhaenge.isEmpty()) {
+                if (!RosenwegHooks.sende(this, rwThreadId, text, antwort)) {
+                    runOnUiThread {
+                        binding.messageHolder.threadTypeMessage.setText(text)
+                    }
+                }
+            } else {
+                // wie die PWA: Text als Bildunterschrift des ersten Anhangs
+                anhaenge.forEachIndexed { i, a ->
+                    RosenwegHooks.sendeMedien(
+                        this, rwThreadId, a.uri, a.mimetype, a.filename,
+                        if (i == 0) text.trim() else "", if (i == 0) antwort else null
+                    )
                 }
             }
         }

@@ -76,3 +76,20 @@ class GeraeteIdTest {
         org.junit.Assert.assertTrue(a, Regex("^dev_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$").matches(a))
     }
 }
+
+class MedienTest {
+    @org.junit.Test
+    fun beschreibungUndDmKlartext() {
+        val b = RosenwegMedien.Beschreibung("m-1", "image/jpeg", "foto.jpg", 1234, "image", "a2V5", "aXY=")
+        org.junit.Assert.assertEquals(b, RosenwegMedien.lies(RosenwegMedien.json(b)))
+        val k = RosenwegMedien.dmKlartext("Schau mal", b)
+        val (t, m) = RwKrypto.medienAusKlartext(k)!!
+        org.junit.Assert.assertEquals("Schau mal", t)
+        org.junit.Assert.assertEquals(b, RosenwegMedien.lies(m))
+        // Gruppe: ohne Schluessel
+        val g = b.copy(key = null, iv = null)
+        org.junit.Assert.assertFalse(RosenwegMedien.json(g).contains("key"))
+        val payload = baueAusgehend("1", "c_1", 1, "", null, RosenwegMedien.json(g))
+        org.junit.Assert.assertEquals("foto.jpg", parseLiveNachricht("group/g/msg/1", payload)!!.mediaName)
+    }
+}

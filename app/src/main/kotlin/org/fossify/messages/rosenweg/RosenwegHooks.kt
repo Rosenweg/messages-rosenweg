@@ -114,6 +114,34 @@ object RosenwegHooks {
         }
     }
 
+    /**
+     * Anhang senden (blockierend, im Hintergrund): lesen, hochladen (DM verschluesselt),
+     * dann wie eine Textnachricht ueber MQTT. text = Bildunterschrift.
+     */
+    fun sendeMedien(context: Context, threadId: Long, uri: android.net.Uri, mime: String, name: String?, text: String, antwortAuf: Long?): Boolean {
+        val speicher = RosenwegSpeicher.get(context)
+        val chat = speicher.chatZuThread(threadId) ?: return false
+        schreibSperre(context, threadId)?.let { grund ->
+            context.toast(grund)
+            return false
+        }
+        return try {
+            val konto = RosenwegKonto.hole(context) ?: throw IllegalStateException("nicht angemeldet")
+            val auswahl = RosenwegMedien.lese(context, uri, mime, name)
+            val b = RosenwegMedien.hochladen(context, RosenwegApi(konto), chat, auswahl)
+            speicher.neueAusgehende(chat, text, antwortAuf = antwortAuf?.let { speicher.nachrichtZuSpiegel(it) }, medien = b)
+                ?: throw IllegalStateException("nicht angemeldet")
+            MessengerVerbindung.sendeAusstehende(context)
+            refreshMessages()
+            refreshConversations()
+            true
+        } catch (e: Exception) {
+            Log.w("RosenwegHooks", "Anhang senden", e)
+            context.toast("Anhang nicht gesendet: ${e.message ?: e.javaClass.simpleName}")
+            false
+        }
+    }
+
     fun markiereThreadGelesen(context: Context, threadId: Long) =
         RosenwegSpeicher.get(context).markiereThreadGelesen(threadId)
 

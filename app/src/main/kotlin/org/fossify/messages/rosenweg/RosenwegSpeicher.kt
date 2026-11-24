@@ -10,7 +10,9 @@ import org.fossify.commons.models.PhoneNumber
 import org.fossify.commons.models.SimpleContact
 import org.fossify.messages.extensions.conversationsDB
 import org.fossify.messages.extensions.messagesDB
+import org.fossify.messages.models.Attachment
 import org.fossify.messages.models.Conversation
+import org.fossify.messages.models.MessageAttachment
 import org.fossify.messages.models.Message
 
 /**
@@ -392,6 +394,7 @@ class RosenwegSpeicher private constructor(context: Context) {
         text: String,
         jetzt: Long = System.currentTimeMillis(),
         antwortAuf: RwMessage? = null,
+        medien: RosenwegMedien.Beschreibung? = null,
     ): RwMessage? = synchronized(sperre) {
         val ich = eigeneId ?: return null
         val roh = RwMessage(
@@ -405,10 +408,11 @@ class RosenwegSpeicher private constructor(context: Context) {
             editedAt = null,
             deleted = false,
             reactions = null,
-            mediaName = null,
+            mediaName = medien?.filename,
+            media = medien?.let { RosenwegMedien.json(it) },
             status = RwStatus.AUSSTEHEND,
             read = true,
-            plain = if (chat.kind == "dm") text else null,
+            plain = if (chat.kind == "dm") (medien?.let { RosenwegMedien.dmKlartext(text, it) } ?: text) else null,
             replyPreview = antwortAuf?.let { "${name(it.senderId)}: ${vorschau(it).take(80)}" },
             replyTo = antwortAuf?.clientMsgId?.let { baueReplyTo(it, antwortAuf.senderId, vorschau(antwortAuf), chat.kind == "dm") },
         )
@@ -456,15 +460,36 @@ class RosenwegSpeicher private constructor(context: Context) {
 
     // ── Spiegel ─────────────────────────────────────────────────────────
 
-    private fun anzeige(m: RwMessage) = anzeigeText(
-        body = m.body,
-        ciphertext = m.ciphertext,
+    /** lokal vorhandene Mediendatei (dann als Fossify-Anhang statt "📎 Name") */
+    private fun lokaleMedien(m: RwMessage): RosenwegMedien.Beschreibung? =
+        RosenwegMedien.lies(m.media)?.takeIf { !m.deleted && RosenwegMedien.vorhanden(app, it.mediaId) }
+
+    private fun anzeige(m: RwMessage, alsAnhang: Boolean = false) = anzeigeText(
+        body = m.body?.takeIf { !(alsAnhang && it.isEmpty()) },
+        ciphertext = if (alsAnhang) null else m.ciphertext,
         deleted = m.deleted,
         editedAt = m.editedAt,
         replyPreview = m.replyPreview,
-        mediaName = m.mediaName,
+        mediaName = if (alsAnhang) null else m.mediaName?.let { if (m.media != null && !m.deleted) "$it (wird geladen …)" else it },
         reactions = reaktionenAusJson(m.reactions),
     )
+
+    private fun anhang(m: RwMessage, b: RosenwegMedien.Beschreibung): MessageAttachment =
+        MessageAttachment(
+            id = m.mirroredMessageId,
+            text = m.body ?: "",
+            attachments = arrayListOf(
+                Attachment(
+                    id = null,
+                    messageId = m.mirroredMessageId,
+                    uriString = RosenwegMedien.uri(app, b.mediaId).toString(),
+                    mimetype = b.mime,
+                    width = 0,
+                    height = 0,
+                    filename = b.filename,
+                )
+            )
+        )
 
     private fun baueMessage(chat: RwChat, m: RwMessage): Message {
         val eigen = m.senderId == eigeneId
@@ -476,9 +501,10 @@ class RosenwegSpeicher private constructor(context: Context) {
         }
         val absender = kontakt(m.senderId)
         val status = if (eigen && m.status == RwStatus.GESENDET) haken(chat, m) else Telephony.Sms.STATUS_NONE
+        val medien = lokaleMedien(m)
         return Message(
             id = m.mirroredMessageId,
-            body = anzeige(m),
+            body = anzeige(m, alsAnhang = medien != null),
             type = typ,
             status = status,
             participants = arrayListOf(absender),
@@ -486,13 +512,28 @@ class RosenwegSpeicher private constructor(context: Context) {
             read = m.read,
             threadId = chat.threadId,
             isMMS = false,
-            attachment = null,
+            attachment = medien?.let { anhang(m, it) },
             senderPhoneNumber = RW_ADRESSE + m.senderId,
             senderName = absender.name,
             senderPhotoUri = absender.photoUri,
             subscriptionId = -1,
         )
     }
+
+    /** Nachrichten mit Medien, deren Datei noch fehlt (neueste zuerst, hoechstens 200) */
+    fun fehlendeMedien(): List<RwMessage> =
+        dao.mitMedien().filter { m ->
+            !m.deleted && RosenwegMedien.lies(m.media)?.let { !RosenwegMedien.vorhanden(app, it.mediaId) } == true
+        }.take(200)
+
+    /** nach dem Herunterladen neu spiegeln */
+    fun spiegleNeu(rowId: Long): Unit = synchronized(sperre) {
+        val m = dao.nachrichtZuZeile(rowId) ?: return
+        val chat = dao.chat(m.chatId) ?: return
+        spiegleNachricht(chat, m)
+    }
+
+
 
     private fun spiegleNachricht(chat: RwChat, m: RwMessage) {
         app.messagesDB.insertOrUpdate(baueMessage(chat, m))

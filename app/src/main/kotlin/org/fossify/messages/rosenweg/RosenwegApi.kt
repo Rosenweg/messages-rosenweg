@@ -61,6 +61,36 @@ class RosenwegApi(private val konto: RosenwegKonto) {
 
     private fun enc(s: String) = URLEncoder.encode(s, "UTF-8").replace("+", "%20")
 
+    // ── Medien ───────────────────────────────────────────────────────────
+
+    fun medienLaden(mediaId: String): ByteArray {
+        val anfrage = Request.Builder()
+            .url(konto.server + "/api/media/${enc(mediaId)}")
+            .header("Authorization", "Bearer ${konto.token}")
+            .build()
+        langsam.newCall(anfrage).execute().use { r ->
+            if (!r.isSuccessful) throw HttpFehler(r.code, "GET media → HTTP ${r.code}")
+            return r.body?.bytes() ?: ByteArray(0)
+        }
+    }
+
+    /** POST /api/media/:conv (Rohdaten), Rueckgabe mediaId */
+    fun medienHochladen(chatId: String, daten: ByteArray, filename: String, mime: String, verschluesselt: Boolean): String {
+        val anfrage = Request.Builder()
+            .url(konto.server + "/api/media/${enc(chatId)}")
+            .header("Authorization", "Bearer ${konto.token}")
+            .header("X-Filename", enc(filename))
+            .header("X-Mime", mime)
+            .header("X-Encrypted", if (verschluesselt) "1" else "0")
+            .post(daten.toRequestBody("application/octet-stream".toMediaType()))
+            .build()
+        langsam.newCall(anfrage).execute().use { r ->
+            if (!r.isSuccessful) throw HttpFehler(r.code, "POST media → HTTP ${r.code}")
+            val o = parseJson(r.body?.string() ?: "") as? JsonObject ?: throw IOException("media: keine Antwort")
+            return o.str("mediaId") ?: throw IOException("media: mediaId fehlt")
+        }
+    }
+
     // ── Reaktionen / Bearbeiten / Loeschen (Server verteilt control/<conv>) ──
 
     fun reagiere(chatId: String, clientMsgId: String, emoji: String, entfernen: Boolean) {
@@ -126,6 +156,11 @@ class RosenwegApi(private val konto: RosenwegKonto) {
                 .build()
         }
         private val JSON = "application/json".toMediaType()
+
+        /** fuer Medien (bis 25 MB) laengere Zeitlimits */
+        private val langsam: OkHttpClient by lazy {
+            http.newBuilder().readTimeout(120, TimeUnit.SECONDS).writeTimeout(120, TimeUnit.SECONDS).build()
+        }
     }
 
     // OkHttp statt HttpURLConnection: PATCH (Umbenennen/Logo) kann HttpURLConnection nicht

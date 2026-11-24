@@ -125,6 +125,10 @@ class MessengerVerbindung : Service() {
     }
     private lateinit var speicher: RosenwegSpeicher
 
+    /** Medien-Downloads getrennt vom MQTT-Arbeits-Thread */
+    private val lader = java.util.concurrent.Executors.newSingleThreadExecutor { r -> Thread(r, "rosenweg-medien") }
+    private val ladeAuftraege = java.util.Collections.synchronizedSet(HashSet<String>())
+
     private var client: RwMqttClient? = null
     private var pingBackup: ScheduledFuture<*>? = null
     @Volatile
@@ -182,6 +186,7 @@ class MessengerVerbindung : Service() {
         stoppePingAlarm()
         arbeiter.execute { trenne(sauber = true) }
         arbeiter.shutdown()
+        lader.shutdownNow()
         super.onDestroy()
     }
 
@@ -410,6 +415,7 @@ class MessengerVerbindung : Service() {
         holeVerlauf()
         holeBackfill()
         schiebeBackfill()
+        speicher.fehlendeMedien().forEach { ladeMedien(it) }
         sendeAusstehendeJetzt()
     }
 
@@ -473,6 +479,26 @@ class MessengerVerbindung : Service() {
             Log.i(TAG, "$n Direktnachrichten aus dem Verlauf anderer Geraete lesbar")
             refreshMessages()
             refreshConversations()
+        }
+    }
+
+    /** Mediendatei im Hintergrund holen (+ DM entschluesseln), danach Thread neu zeichnen */
+    private fun ladeMedien(m: RwMessage) {
+        val b = RosenwegMedien.lies(m.media) ?: return
+        if (m.deleted || RosenwegMedien.vorhanden(this, b.mediaId)) return
+        if (b.size > RosenwegMedien.MAX_BYTES) return
+        if (!ladeAuftraege.add(b.mediaId)) return
+        val k = konto ?: return
+        lader.execute {
+            try {
+                RosenwegMedien.lade(this, RosenwegApi(k), b)
+                speicher.spiegleNeu(m.rowId)
+                refreshMessages()
+            } catch (e: Exception) {
+                Log.w(TAG, "Medien ${b.mediaId} nicht ladbar", e)
+            } finally {
+                ladeAuftraege.remove(b.mediaId)
+            }
         }
     }
 
@@ -682,6 +708,7 @@ class MessengerVerbindung : Service() {
                     val e = speicher.nimmAuf(speicher.chat(chat.id) ?: chat, klartext(chat, d), ausVerlauf = false, gelesen = false)
                     refreshMessages()
                     refreshConversations()
+                    if (e.nachricht.media != null) ladeMedien(e.nachricht)
                     if (e.neu && e.nachricht.senderId != speicher.eigeneId) {
                         sendeQuittungen()
                         benachrichtige(e)
@@ -781,7 +808,7 @@ class MessengerVerbindung : Service() {
                     continue
                 }
             } else {
-                baueAusgehend(ich, m.clientMsgId ?: continue, m.ts, m.body, m.replyTo)
+                baueAusgehend(ich, m.clientMsgId ?: continue, m.ts, m.body, m.replyTo, m.media)
             }
             // QoS 1: PUBACK → gesendet; ohne PUBACK bleibt sie ausstehend und geht bei der
             // naechsten Verbindung erneut raus (Server entdoppelt am clientMsgId)
