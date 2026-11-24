@@ -279,20 +279,33 @@ fun medienName(m: JsonObject): String = m.str("filename") ?: if (m.str("mtype") 
 fun medienNameAusJson(json: String?): String? = (json?.let { parseJson(it) } as? JsonObject)?.let { medienName(it) }
 
 /** Nutzlast einer ausgehenden DM: nur das E2E-Buendel (nie Klartext). */
-fun baueAusgehendDm(senderId: String, clientMsgId: String, ts: Long, buendel: String): String =
+fun baueAusgehendDm(senderId: String, clientMsgId: String, ts: Long, buendel: String, replyTo: String? = null): String =
     buildJsonObject {
         put("senderId", senderId)
         put("clientMsgId", clientMsgId)
         put("ts", ts)
         put("ciphertext", parseJson(buendel) ?: throw IllegalArgumentException("Buendel kein JSON"))
+        replyTo?.let { parseJson(it) }?.let { put("replyTo", it) }
     }.toString()
 
-fun baueAusgehend(senderId: String, clientMsgId: String, ts: Long, body: String): String =
+fun baueAusgehend(senderId: String, clientMsgId: String, ts: Long, body: String, replyTo: String? = null): String =
     buildJsonObject {
         put("senderId", senderId)
         put("clientMsgId", clientMsgId)
         put("ts", ts)
         put("body", body)
+        replyTo?.let { parseJson(it) }?.let { put("replyTo", it) }
+    }.toString()
+
+/**
+ * replyTo wie die PWA: {clientMsgId, senderId, preview}. In DMs darf der Server den
+ * zitierten Text nicht sehen → neutrale Vorschau "Antwort".
+ */
+fun baueReplyTo(clientMsgId: String, senderId: String, vorschau: String, istDm: Boolean): String =
+    buildJsonObject {
+        put("clientMsgId", clientMsgId)
+        put("senderId", senderId)
+        put("preview", if (istDm) "Antwort" else vorschau.take(120))
     }.toString()
 
 fun bauePresence(online: Boolean, ts: Long = System.currentTimeMillis()): String =

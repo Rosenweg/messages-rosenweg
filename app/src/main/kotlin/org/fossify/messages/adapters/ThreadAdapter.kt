@@ -111,6 +111,12 @@ class ThreadAdapter(
     /** Rosenweg-Gruppen/-Kanaele: Absendername ueber eingehenden Nachrichten zeigen */
     var showSenderNames = false
 
+    /** Rosenweg: Antworten/Reagieren/Bearbeiten/Loeschen (Aktion, Nachricht); null = SMS-Thread */
+    var rosenwegAktion: ((Int, Message) -> Unit)? = null
+
+    /** Rosenweg: Bearbeiten nur in Gruppen/Kanaelen (nicht in E2E-DMs) */
+    var rosenwegBearbeitbar = false
+
     @SuppressLint("MissingPermission")
     private val hasMultipleSIMCards = (activity.subscriptionManagerCompat().activeSubscriptionInfoList?.size ?: 0) > 1
     private val maxChatBubbleWidth = (activity.usableScreenSize.x * 0.8f).toInt()
@@ -145,6 +151,17 @@ class ThreadAdapter(
             findItem(R.id.cab_select_text).isVisible = isOneItemSelected && hasText
             findItem(R.id.cab_properties).isVisible = isOneItemSelected
             findItem(R.id.cab_restore).isVisible = isRecycleBin
+
+            val rw = rosenwegAktion != null && !isRecycleBin && isOneItemSelected &&
+                selectedMessages.singleOrNull()?.id?.let { it < 0 } == true
+            val einzelne = selectedMessages.singleOrNull()
+            val eigene = einzelne != null && !einzelne.isReceivedMessage()
+            val geloescht = einzelne?.body == org.fossify.messages.rosenweg.RW_TEXT_GELOESCHT
+            findItem(R.id.cab_rw_antworten).isVisible = rw && !geloescht
+            findItem(R.id.cab_rw_reagieren).isVisible = rw && !geloescht
+            findItem(R.id.cab_rw_bearbeiten).isVisible = rw && eigene && !geloescht && rosenwegBearbeitbar
+            findItem(R.id.cab_rw_loeschen).isVisible = rw && eigene && !geloescht
+            findItem(R.id.cab_forward_message).isVisible = isOneItemSelected && !rw
         }
     }
 
@@ -153,6 +170,12 @@ class ThreadAdapter(
             return
         }
 
+        if (id == R.id.cab_rw_antworten || id == R.id.cab_rw_reagieren || id == R.id.cab_rw_bearbeiten || id == R.id.cab_rw_loeschen) {
+            val m = getSelectedItems().filterIsInstance<Message>().singleOrNull() ?: return
+            rosenwegAktion?.invoke(id, m)
+            finishActMode()
+            return
+        }
         when (id) {
             R.id.cab_copy_to_clipboard -> copyToClipboard()
             R.id.cab_save_as -> saveAs()

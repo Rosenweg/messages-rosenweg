@@ -89,6 +89,8 @@ data class RwMessage(
     @ColumnInfo(name = "plain") val plain: String? = null,
     /** Medien-Beschreibung (JSON) fuer die Medien-Anzeige */
     @ColumnInfo(name = "media") val media: String? = null,
+    /** eigene Antwort: replyTo-JSON fuer die Nutzlast {clientMsgId, senderId, preview} */
+    @ColumnInfo(name = "reply_to") val replyTo: String? = null,
 )
 
 /** Verlauf, den ein anderes Geraet fuer dieses neu verschluesselt hat (bis die Nachricht da ist) */
@@ -203,7 +205,7 @@ interface RosenwegDao {
     fun speichereBenutzer(users: List<RwUser>)
 }
 
-@Database(entities = [RwChat::class, RwMessage::class, RwUser::class, RwBackfill::class], version = 3, exportSchema = true)
+@Database(entities = [RwChat::class, RwMessage::class, RwUser::class, RwBackfill::class], version = 4, exportSchema = true)
 abstract class RosenwegDatenbank : RoomDatabase() {
     abstract fun dao(): RosenwegDao
 
@@ -236,6 +238,11 @@ abstract class RosenwegDatenbank : RoomDatabase() {
                         "CREATE TABLE IF NOT EXISTS `backfill` (`conv_id` TEXT NOT NULL, `orig_msg_id` INTEGER NOT NULL, " +
                             "`ciphertext` TEXT NOT NULL, PRIMARY KEY(`conv_id`, `orig_msg_id`))"
                     )
+                }
+            },
+            object : Migration(3, 4) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE rwmessage ADD COLUMN reply_to TEXT")
                 }
             },
         )

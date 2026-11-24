@@ -20,6 +20,9 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.fossify.commons.extensions.toast
 import org.fossify.commons.helpers.ensureBackgroundThread
 import org.fossify.messages.R
@@ -406,6 +409,7 @@ class MessengerVerbindung : Service() {
 
         holeVerlauf()
         holeBackfill()
+        schiebeBackfill()
         sendeAusstehendeJetzt()
     }
 
@@ -469,6 +473,73 @@ class MessengerVerbindung : Service() {
             Log.i(TAG, "$n Direktnachrichten aus dem Verlauf anderer Geraete lesbar")
             refreshMessages()
             refreshConversations()
+        }
+    }
+
+    private var backfillGeschoben = 0L
+
+    /**
+     * Wie autoBackfillDevices der PWA: lesbare DMs fuer eigene andere Geraete und die
+     * Geraete des Gegenuebers (zuletzt gesehen < 45 Tage) neu verschluesseln und unter
+     * /api/link/backfill ablegen. Wasserzeichen je (Chat, Geraet); hoechstens stuendlich.
+     */
+    private fun schiebeBackfill() {
+        val jetzt = System.currentTimeMillis()
+        if (jetzt - backfillGeschoben < 60 * 60_000) return
+        backfillGeschoben = jetzt
+        val k = konto ?: return
+        val s = schluessel ?: return
+        val api = RosenwegApi(k)
+        val grenze = jetzt - 45L * 24 * 60 * 60_000
+        val prefs = getSharedPreferences("rosenweg_backfill_${k.userId}", MODE_PRIVATE)
+        val eigene = try {
+            api.eigeneGeraete().filter { it.deviceId != s.geraeteId && (it.lastSeen == null || it.lastSeen >= grenze) }
+        } catch (e: Exception) {
+            Log.w(TAG, "eigene Geraete nicht abrufbar", e)
+            emptyList()
+        }
+        for (chat in chatsNachId.values.filter { it.kind == "dm" }) {
+            val partner = speicher.dmPartner(chat)
+            val fremde = try {
+                partner?.let { geraeteVon(it) }?.filter { it.lastSeen == null || it.lastSeen >= grenze } ?: emptyList()
+            } catch (e: Exception) {
+                Log.w(TAG, "Geraete des Gegenuebers nicht abrufbar", e)
+                emptyList()
+            }
+            // je Geraet gilt der neueste Schluessel (Server liefert aufsteigend nach added_at)
+            val ziele = (eigene + fremde).reversed().distinctBy { it.deviceId }.filter { it.deviceId != s.geraeteId }
+            if (ziele.isEmpty()) continue
+            val lesbar = speicher.lesbareDms(chat.id)
+            val maxId = lesbar.maxOfOrNull { it.serverId ?: 0L } ?: continue
+            for (ziel in ziele) {
+                val wmKey = "${chat.id}|${ziel.deviceId}"
+                val wm = prefs.getLong(wmKey, 0L)
+                if (wm >= maxId) continue
+                val offen = lesbar.filter { (it.serverId ?: 0L) > wm }
+                try {
+                    for (teil in offen.chunked(200)) {
+                        val eintraege = teil.mapNotNull { m ->
+                            val buendel = try {
+                                RwKrypto.verschluessele(m.plain ?: return@mapNotNull null, mapOf(ziel.deviceId to ziel.pubkey))
+                            } catch (_: Exception) {
+                                return@mapNotNull null
+                            }
+                            buildJsonObject {
+                                put("convId", chat.id)
+                                put("origMsgId", m.serverId)
+                                put("senderId", m.senderId)
+                                put("createdAt", java.time.Instant.ofEpochMilli(m.ts).toString())
+                                put("ciphertext", parseJson(buendel)!!)
+                            }
+                        }
+                        if (eintraege.isNotEmpty()) api.backfillSenden(ziel.deviceId, JsonArray(eintraege).toString())
+                    }
+                    prefs.edit().putLong(wmKey, maxId).apply()
+                    Log.i(TAG, "Verlauf ${chat.id}: ${offen.size} DMs fuer Geraet ${ziel.deviceId.take(12)}… abgelegt")
+                } catch (e: Exception) {
+                    Log.w(TAG, "Verlauf fuer Geraet ${ziel.deviceId.take(12)}… nicht abgelegt", e)
+                }
+            }
         }
     }
 
@@ -703,14 +774,14 @@ class MessengerVerbindung : Service() {
                     continue
                 }
                 try {
-                    baueAusgehendDm(ich, m.clientMsgId ?: continue, m.ts, RwKrypto.verschluessele(m.plain ?: m.body, ziele))
+                    baueAusgehendDm(ich, m.clientMsgId ?: continue, m.ts, RwKrypto.verschluessele(m.plain ?: m.body, ziele), m.replyTo)
                 } catch (e: Exception) {
                     Log.w(TAG, "DM: Verschluesselung fehlgeschlagen", e)
                     speicher.setzeStatus(m.rowId, RwStatus.FEHLER)
                     continue
                 }
             } else {
-                baueAusgehend(ich, m.clientMsgId ?: continue, m.ts, m.body)
+                baueAusgehend(ich, m.clientMsgId ?: continue, m.ts, m.body, m.replyTo)
             }
             // QoS 1: PUBACK → gesendet; ohne PUBACK bleibt sie ausstehend und geht bei der
             // naechsten Verbindung erneut raus (Server entdoppelt am clientMsgId)

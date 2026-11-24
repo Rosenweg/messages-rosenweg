@@ -61,6 +61,27 @@ class RosenwegApi(private val konto: RosenwegKonto) {
 
     private fun enc(s: String) = URLEncoder.encode(s, "UTF-8").replace("+", "%20")
 
+    // ── Reaktionen / Bearbeiten / Loeschen (Server verteilt control/<conv>) ──
+
+    fun reagiere(chatId: String, clientMsgId: String, emoji: String, entfernen: Boolean) {
+        anfrage("POST", "/api/messages/${enc(chatId)}/react", buildJsonObject {
+            put("clientMsgId", clientMsgId)
+            put("emoji", emoji)
+            put("op", if (entfernen) "remove" else "add")
+        }.toString())
+    }
+
+    fun bearbeite(chatId: String, clientMsgId: String, text: String) {
+        anfrage("POST", "/api/messages/${enc(chatId)}/edit", buildJsonObject {
+            put("clientMsgId", clientMsgId)
+            put("body", text)
+        }.toString())
+    }
+
+    fun loescheFuerAlle(chatId: String, clientMsgId: String) {
+        anfrage("POST", "/api/messages/${enc(chatId)}/delete", buildJsonObject { put("clientMsgId", clientMsgId) }.toString())
+    }
+
     // ── Gruppen-Verwaltung (wie pwa/app.js) ─────────────────────────────
 
     data class Mitglied(val userId: String, val role: String)

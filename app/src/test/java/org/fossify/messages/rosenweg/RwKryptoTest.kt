@@ -66,3 +66,13 @@ class RwKryptoTest {
         )
     }
 }
+
+class GeraeteIdTest {
+    @org.junit.Test
+    fun stabilJeTelefonUndBenutzer() {
+        val a = RwGeraeteSchluessel.stabileIdAus("a1b2c3", "42")
+        org.junit.Assert.assertEquals(a, RwGeraeteSchluessel.stabileIdAus("a1b2c3", "42"))
+        org.junit.Assert.assertNotEquals(a, RwGeraeteSchluessel.stabileIdAus("a1b2c3", "43"))
+        org.junit.Assert.assertTrue(a, Regex("^dev_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$").matches(a))
+    }
+}

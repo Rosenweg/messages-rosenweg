@@ -235,6 +235,9 @@ class ThreadActivity : SimpleActivity() {
     /** Rosenweg-Chat (negative Thread-ID): kein SMS, Senden ueber MQTT */
     private val isRosenweg get() = threadId.isRosenwegThread()
 
+    /** Rosenweg: Antwort auf diese (gespiegelte) Nachricht, null = keine */
+    private var rwAntwortAuf: Long? = null
+
     private val binding by viewBinding(ActivityThreadBinding::inflate)
 
     override fun onNewIntent(intent: Intent) {
@@ -615,6 +618,8 @@ class ThreadActivity : SimpleActivity() {
         }
         (currAdapter as ThreadAdapter).showSenderNames =
             isRosenweg && conversation?.isGroupConversation != false
+        currAdapter.rosenwegBearbeitbar = isRosenweg && conversation?.isGroupConversation == true
+        currAdapter.rosenwegAktion = if (isRosenweg) { aktion, m -> rosenwegAktion(aktion, m) } else null
         return currAdapter
     }
 
@@ -1087,6 +1092,98 @@ class ThreadActivity : SimpleActivity() {
             binding.shortCodeHolder.root.beGone()
             binding.messageHolder.root.beVisible()
         }
+    }
+
+    // ── Rosenweg: Antworten / Reagieren / Bearbeiten / Loeschen ────────────
+
+    private fun rosenwegAktion(aktion: Int, message: Message) {
+        when (aktion) {
+            R.id.cab_rw_antworten -> starteAntwort(message.id)
+            R.id.cab_rw_reagieren -> reagieren(message.id)
+            R.id.cab_rw_bearbeiten -> bearbeiten(message.id)
+            R.id.cab_rw_loeschen -> loeschenFuerAlle(message.id)
+        }
+    }
+
+    private fun starteAntwort(mirrorId: Long) {
+        ensureBackgroundThread {
+            val vorschau = RosenwegHooks.antwortVorschau(this, mirrorId) ?: return@ensureBackgroundThread
+            runOnUiThread {
+                rwAntwortAuf = mirrorId
+                binding.messageHolder.apply {
+                    scheduledMessageHolder.beVisible()
+                    scheduledMessageIcon.setImageResource(org.fossify.commons.R.drawable.ic_undo_vector)
+                    scheduledMessageIcon.applyColorFilter(getProperTextColor())
+                    scheduledMessageButton.text = "Antwort an $vorschau"
+                    scheduledMessageButton.setOnClickListener(null)
+                    discardScheduledMessage.setOnClickListener { beendeAntwort() }
+                    threadTypeMessage.requestFocus()
+                }
+                showKeyboard(binding.messageHolder.threadTypeMessage)
+            }
+        }
+    }
+
+    private fun beendeAntwort() {
+        rwAntwortAuf = null
+        binding.messageHolder.scheduledMessageHolder.beGone()
+    }
+
+    private fun reagieren(mirrorId: Long) {
+        ensureBackgroundThread {
+            val meine = RosenwegHooks.meineReaktionen(this, mirrorId)
+            runOnUiThread {
+                val emojis = RosenwegHooks.EMOJIS
+                val beschriftung = emojis.map { if (it in meine) "$it  (entfernen)" else it }.toTypedArray()
+                androidx.appcompat.app.AlertDialog.Builder(this)
+                    .setTitle("Reagieren")
+                    .setItems(beschriftung) { _, i ->
+                        val emoji = emojis[i]
+                        RosenwegHooks.aktion(this, mirrorId, "Reaktion nicht möglich") { api, chat, id ->
+                            api.reagiere(chat.id, id, emoji, emoji in meine)
+                        }
+                    }
+                    .setNegativeButton("Abbrechen", null)
+                    .show()
+            }
+        }
+    }
+
+    private fun bearbeiten(mirrorId: Long) {
+        ensureBackgroundThread {
+            val alt = RosenwegHooks.rohText(this, mirrorId) ?: return@ensureBackgroundThread
+            runOnUiThread {
+                val feld = android.widget.EditText(this).apply {
+                    setText(alt)
+                    setSelection(text.length)
+                }
+                androidx.appcompat.app.AlertDialog.Builder(this)
+                    .setTitle("Nachricht bearbeiten")
+                    .setView(feld)
+                    .setPositiveButton("Speichern") { _, _ ->
+                        val neu = feld.text.toString().trim()
+                        if (neu.isNotEmpty() && neu != alt) {
+                            RosenwegHooks.aktion(this, mirrorId, "Bearbeiten nicht möglich") { api, chat, id ->
+                                api.bearbeite(chat.id, id, neu)
+                            }
+                        }
+                    }
+                    .setNegativeButton("Abbrechen", null)
+                    .show()
+            }
+        }
+    }
+
+    private fun loeschenFuerAlle(mirrorId: Long) {
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setMessage("Nachricht für alle löschen?")
+            .setPositiveButton("Löschen") { _, _ ->
+                RosenwegHooks.aktion(this, mirrorId, "Löschen nicht möglich") { api, chat, id ->
+                    api.loescheFuerAlle(chat.id, id)
+                }
+            }
+            .setNegativeButton("Abbrechen", null)
+            .show()
     }
 
     private fun isSpecialNumber(): Boolean {
@@ -1760,9 +1857,11 @@ class ThreadActivity : SimpleActivity() {
     private fun sendRosenwegMessage(text: String) {
         if (text.isBlank()) return
         val rwThreadId = threadId
+        val antwort = rwAntwortAuf
         clearCurrentMessage()
+        beendeAntwort()
         ensureBackgroundThread {
-            if (!RosenwegHooks.sende(this, rwThreadId, text)) {
+            if (!RosenwegHooks.sende(this, rwThreadId, text, antwort)) {
                 runOnUiThread {
                     binding.messageHolder.threadTypeMessage.setText(text)
                 }

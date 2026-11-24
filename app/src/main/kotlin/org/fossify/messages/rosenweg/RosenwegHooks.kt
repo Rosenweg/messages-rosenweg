@@ -44,14 +44,14 @@ object RosenwegHooks {
     }
 
     /** Senden in einem Rosenweg-Thread (blockierend, im Hintergrund aufrufen). */
-    fun sende(context: Context, threadId: Long, text: String): Boolean {
+    fun sende(context: Context, threadId: Long, text: String, antwortAuf: Long? = null): Boolean {
         val speicher = RosenwegSpeicher.get(context)
         val chat = speicher.chatZuThread(threadId) ?: return false
         schreibSperre(context, threadId)?.let { grund ->
             context.toast(grund)
             return false
         }
-        val m = speicher.neueAusgehende(chat, text) ?: run {
+        val m = speicher.neueAusgehende(chat, text, antwortAuf = antwortAuf?.let { speicher.nachrichtZuSpiegel(it) }) ?: run {
             context.toast("Rosenweg Messenger ist nicht angemeldet")
             return false
         }
@@ -72,6 +72,44 @@ object RosenwegHooks {
         ensureBackgroundThread {
             if (RosenwegSpeicher.get(app).quittiereGelesen(threadId) && MessengerVerbindung.istAktiv()) {
                 MessengerVerbindung.sendeAusstehende(app)
+            }
+        }
+    }
+
+    // ── Antworten / Reagieren / Bearbeiten / Loeschen (Aufrufe im Hintergrund) ──
+
+    val EMOJIS = listOf("👍", "❤️", "😂", "😮", "😢", "🙏")
+
+    /** "Name: Vorschau" fuer die Antwort-Leiste */
+    fun antwortVorschau(context: Context, mirrorId: Long): String? {
+        val s = RosenwegSpeicher.get(context)
+        val m = s.nachrichtZuSpiegel(mirrorId) ?: return null
+        return "${s.name(m.senderId)}: ${s.vorschau(m).take(80)}"
+    }
+
+    fun rohText(context: Context, mirrorId: Long): String? = RosenwegSpeicher.get(context).nachrichtZuSpiegel(mirrorId)?.body
+
+    fun meineReaktionen(context: Context, mirrorId: Long): Set<String> {
+        val s = RosenwegSpeicher.get(context)
+        val ich = s.eigeneId ?: return emptySet()
+        val m = s.nachrichtZuSpiegel(mirrorId) ?: return emptySet()
+        return reaktionenAusJson(m.reactions).filterValues { ich in it }.keys
+    }
+
+    /** Ruft die API fuer eine Nachricht auf; Ergebnis per Toast. Der Server verteilt die Aenderung (control/<conv>). */
+    fun aktion(context: Context, mirrorId: Long, fehlerText: String, block: (RosenwegApi, RwChat, String) -> Unit) {
+        val app = context.applicationContext
+        ensureBackgroundThread {
+            try {
+                val s = RosenwegSpeicher.get(app)
+                val m = s.nachrichtZuSpiegel(mirrorId) ?: throw IllegalStateException("Nachricht fehlt")
+                val id = m.clientMsgId ?: throw IllegalStateException("Nachricht noch nicht gesendet")
+                val chat = s.chat(m.chatId) ?: throw IllegalStateException("Chat fehlt")
+                val konto = RosenwegKonto.hole(app) ?: throw IllegalStateException("nicht angemeldet")
+                block(RosenwegApi(konto), chat, id)
+            } catch (e: Exception) {
+                Log.w("RosenwegHooks", fehlerText, e)
+                app.toast(fehlerText)
             }
         }
     }

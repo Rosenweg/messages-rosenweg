@@ -376,7 +376,23 @@ class RosenwegSpeicher private constructor(context: Context) {
     }
 
     /** Eigene Nachricht vormerken (OUTBOX), bis Broker-Bestaetigung oder Echo kommt. */
-    fun neueAusgehende(chat: RwChat, text: String, jetzt: Long = System.currentTimeMillis()): RwMessage? = synchronized(sperre) {
+    /** Rosenweg-Nachricht zu einer gespiegelten Fossify-ID (negativ) */
+    fun nachrichtZuSpiegel(id: Long): RwMessage? = if (id < 0) dao.nachrichtZuZeile(RosenwegIds.zeile(id)) else null
+
+    /** Kurzer Text fuer Antwort-Vorschau (ohne Reaktionen/Zitat) */
+    fun vorschau(m: RwMessage): String = when {
+        m.deleted -> RW_TEXT_GELOESCHT
+        m.body != null -> m.body
+        m.mediaName != null -> "📎 ${m.mediaName}"
+        else -> RW_TEXT_VERSCHLUESSELT
+    }
+
+    fun neueAusgehende(
+        chat: RwChat,
+        text: String,
+        jetzt: Long = System.currentTimeMillis(),
+        antwortAuf: RwMessage? = null,
+    ): RwMessage? = synchronized(sperre) {
         val ich = eigeneId ?: return null
         val roh = RwMessage(
             serverId = null,
@@ -389,11 +405,12 @@ class RosenwegSpeicher private constructor(context: Context) {
             editedAt = null,
             deleted = false,
             reactions = null,
-            replyPreview = null,
             mediaName = null,
             status = RwStatus.AUSSTEHEND,
             read = true,
             plain = if (chat.kind == "dm") text else null,
+            replyPreview = antwortAuf?.let { "${name(it.senderId)}: ${vorschau(it).take(80)}" },
+            replyTo = antwortAuf?.clientMsgId?.let { baueReplyTo(it, antwortAuf.senderId, vorschau(antwortAuf), chat.kind == "dm") },
         )
         val zeile = dao.neueNachricht(roh)
         val m = roh.copy(rowId = zeile, mirroredMessageId = RosenwegIds.nachrichtId(zeile))

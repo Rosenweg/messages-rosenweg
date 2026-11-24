@@ -2,6 +2,7 @@ package org.fossify.messages.rosenweg
 
 import android.content.Context
 import android.os.Build
+import android.provider.Settings
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Log
@@ -73,13 +74,32 @@ class RwGeraeteSchluessel private constructor(
 
             val geladen = id?.let { lade(context, it) }
             val s = geladen ?: run {
-                val neu = "dev_" + UUID.randomUUID().toString()
-                erzeuge(context, neu)
+                // Geteilte Telefone: beim Abmelden werden die App-Daten (samt Keystore)
+                // geloescht. Damit nicht jede Anmeldung ein neues Geraet auf dem Server
+                // hinterlaesst, ist die ID je (Telefon, Benutzer) fest; nur der Schluessel
+                // ist dann neu und ersetzt den alten (neuester Schluessel je Geraet gilt).
+                val neu = stabileId(context, userId)
+                lade(context, neu) ?: erzeuge(context, neu)
             }
             prefs.edit().putString(key, s.geraeteId).apply()
             cache = s
             cacheUser = userId
             return s
+        }
+
+        /** "dev_" + UUID-Form aus SHA-256(ANDROID_ID|userId) – ueberlebt das Loeschen der App-Daten */
+        fun stabileId(context: Context, userId: String): String {
+            @Suppress("HardwareIds")
+            val androidId = Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID)
+            if (androidId.isNullOrEmpty()) return "dev_" + UUID.randomUUID().toString()
+            return stabileIdAus(androidId, userId)
+        }
+
+        fun stabileIdAus(androidId: String, userId: String): String {
+            val h = java.security.MessageDigest.getInstance("SHA-256")
+                .digest("rw-dm-geraet|$androidId|$userId".toByteArray(Charsets.UTF_8))
+                .joinToString("") { "%02x".format(it) }
+            return "dev_${h.substring(0, 8)}-${h.substring(8, 12)}-${h.substring(12, 16)}-${h.substring(16, 20)}-${h.substring(20, 32)}"
         }
 
         private fun keystore() = KeyStore.getInstance(KEYSTORE).apply { load(null) }
