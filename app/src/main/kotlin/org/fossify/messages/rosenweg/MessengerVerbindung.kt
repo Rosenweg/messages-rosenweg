@@ -1,10 +1,12 @@
 package org.fossify.messages.rosenweg
 
+import android.app.AlarmManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
@@ -12,18 +14,12 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
+import android.os.SystemClock
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
-import org.eclipse.paho.client.mqttv3.IMqttActionListener
-import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken
-import org.eclipse.paho.client.mqttv3.IMqttToken
-import org.eclipse.paho.client.mqttv3.MqttAsyncClient
-import org.eclipse.paho.client.mqttv3.MqttCallbackExtended
-import org.eclipse.paho.client.mqttv3.MqttConnectOptions
-import org.eclipse.paho.client.mqttv3.MqttMessage
-import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence
 import org.fossify.commons.helpers.ensureBackgroundThread
 import org.fossify.messages.R
 import org.fossify.messages.activities.MainActivity
@@ -39,15 +35,22 @@ import java.util.concurrent.TimeUnit
  * Rosenweg-Broker offen, holt Verlauf nach, nimmt Nachrichten auf, zeigt die
  * normale Nachrichten-Benachrichtigung und verschickt ausstehende eigene Nachrichten.
  *
- * Alles laeuft auf EINEM Arbeits-Thread (arbeiter); Paho-Rueckrufe werden dorthin
- * weitergereicht. Bei jeder (Wieder-)Verbindung wird ein frisches MQTT-JWT geholt,
+ * Alles laeuft auf EINEM Arbeits-Thread (arbeiter); Rueckrufe des eigenen
+ * MQTT-Clients (RwMqttClient, OkHttp-WebSocket) werden dorthin weitergereicht.
+ * Das MQTT-Lebenszeichen (PINGREQ) plant der AlarmManager, damit Doze die
+ * Verbindung nicht einschlafen laesst. Bei jeder (Wieder-)Verbindung wird ein frisches MQTT-JWT geholt,
  * weil es die Topic-Rechte traegt.
  */
 class MessengerVerbindung : Service() {
 
     companion object {
         private const val TAG = "MessengerVerbindung"
-        private const val BROKER = "wss://mqtt.rosenweg4303.ch:443/mqtt"
+        private const val BROKER = "wss://mqtt.rosenweg4303.ch/mqtt"
+        private const val KEEPALIVE_S = 60
+        private const val PING_ALLE_MS = 45_000L
+        private const val PING_ANTWORT_MS = 10_000L
+        private const val CONNACK_WARTEN_S = 30L
+        private const val AKTION_PING = "ch.rosenweg4303.messages.MQTT_PING"
         private const val KANAL = "rosenweg_verbindung"
         private const val NOTIF_ID = 4303
         private const val AKTION_SENDEN = "ch.rosenweg4303.messages.SENDEN"
@@ -68,7 +71,7 @@ class MessengerVerbindung : Service() {
                     try {
                         ContextCompat.startForegroundService(app, Intent(app, MessengerVerbindung::class.java))
                     } catch (e: Exception) {
-                        Log.w(TAG, "Dienst nicht startbar: ${e.message}")
+                        Log.w(TAG, "Dienst nicht startbar", e)
                     }
                 }
             }
@@ -87,11 +90,25 @@ class MessengerVerbindung : Service() {
             try {
                 ContextCompat.startForegroundService(app, Intent(app, MessengerVerbindung::class.java).setAction(AKTION_SENDEN))
             } catch (e: Exception) {
-                Log.w(TAG, "Senden: Dienst nicht startbar: ${e.message}")
+                Log.w(TAG, "Senden: Dienst nicht startbar", e)
             }
         }
 
         fun istAktiv() = laeuft
+
+        /** Vom Ping-Alarm (RosenwegPingReceiver), mit gehaltenem WakeLock. */
+        internal fun pingVomAlarm(context: Context, wachhalten: PowerManager.WakeLock) {
+            val dienst = instanz
+            if (dienst == null) {
+                if (wachhalten.isHeld) wachhalten.release()
+                return
+            }
+            try {
+                dienst.arbeiter.execute { dienst.pinge(wachhalten) }
+            } catch (_: Exception) {
+                if (wachhalten.isHeld) wachhalten.release()
+            }
+        }
     }
 
     private val arbeiter = ScheduledThreadPoolExecutor(1) { r -> Thread(r, "rosenweg-mqtt") }.apply {
@@ -101,7 +118,10 @@ class MessengerVerbindung : Service() {
     }
     private lateinit var speicher: RosenwegSpeicher
 
-    private var client: MqttAsyncClient? = null
+    private var client: RwMqttClient? = null
+    private var pingBackup: ScheduledFuture<*>? = null
+    @Volatile
+    private var kontoNeuHolen = false
     private var generation = 0
     private var verbunden = false
     private var verbindetGerade = false
@@ -150,6 +170,7 @@ class MessengerVerbindung : Service() {
             } catch (_: Exception) {
             }
         }
+        stoppePingAlarm()
         arbeiter.execute { trenne(sauber = true) }
         arbeiter.shutdown()
         super.onDestroy()
@@ -188,7 +209,7 @@ class MessengerVerbindung : Service() {
         try {
             ServiceCompat.startForeground(this, NOTIF_ID, n, typ)
         } catch (e: Exception) {
-            Log.w(TAG, "startForeground fehlgeschlagen: ${e.message}")
+            Log.w(TAG, "startForeground fehlgeschlagen", e)
             stopSelf()
         }
     }
@@ -210,7 +231,7 @@ class MessengerVerbindung : Service() {
             cm.registerDefaultNetworkCallback(rueckruf)
             netzRueckruf = rueckruf
         } catch (e: Exception) {
-            Log.w(TAG, "Netz-Rueckruf: ${e.message}")
+            Log.w(TAG, "Netz-Rueckruf", e)
         }
     }
 
@@ -220,7 +241,8 @@ class MessengerVerbindung : Service() {
         if (arbeiter.isShutdown) return
         trenne(sauber = false)
         verbindetGerade = true
-        val k = RosenwegKonto.hole(this)
+        val k = RosenwegKonto.hole(this, erzwingen = kontoNeuHolen)
+        kontoNeuHolen = false
         if (k == null) {
             Log.i(TAG, "kein Messenger-Zugang mehr - Dienst endet")
             verbindetGerade = false
@@ -240,7 +262,7 @@ class MessengerVerbindung : Service() {
                     speicher.speichereVerzeichnis(api.verzeichnis())
                     verzeichnisGeholt = System.currentTimeMillis()
                 } catch (e: Exception) {
-                    Log.w(TAG, "Verzeichnis: ${e.message}")
+                    Log.w(TAG, "Verzeichnis", e)
                 }
             }
 
@@ -251,7 +273,7 @@ class MessengerVerbindung : Service() {
                     try {
                         mitglieder[g.id] = api.mitglieder(g.id)
                     } catch (e: Exception) {
-                        Log.w(TAG, "Mitglieder ${g.id}: ${e.message}")
+                        Log.w(TAG, "Mitglieder ${g.id}", e)
                     }
                 }
             }
@@ -267,7 +289,7 @@ class MessengerVerbindung : Service() {
 
             verbindeMqtt(k, deviceId, zugang)
         } catch (e: Exception) {
-            Log.w(TAG, "Verbindung fehlgeschlagen: ${e.message}")
+            Log.w(TAG, "Verbindung fehlgeschlagen", e)
             verbindetGerade = false
             if (e is RosenwegApi.HttpFehler && e.code == 401) {
                 RosenwegKonto.vergiss()
@@ -278,76 +300,71 @@ class MessengerVerbindung : Service() {
 
     private fun verbindeMqtt(k: RosenwegKonto, deviceId: String, zugang: RosenwegApi.MqttZugang) {
         val gen = ++generation
-        val c = MqttAsyncClient(BROKER, "and_$deviceId", MemoryPersistence())
-        client = c
-        c.setCallback(object : MqttCallbackExtended {
-            override fun connectComplete(reconnect: Boolean, serverURI: String?) {}
+        val c = RwMqttClient(BROKER, object : RwMqttClient.Hoerer {
+            override fun verbunden() {
+                arbeiter.execute { if (gen == generation) nachVerbindung(k, zugang) }
+            }
 
-            override fun connectionLost(cause: Throwable?) {
+            override fun abgelehnt(code: Int) {
+                Log.w(TAG, "Broker lehnt ab: CONNACK $code")
+                // 4/5 = Anmeldung abgelehnt → beim naechsten Versuch Zugang + Token neu holen
+                if (code == 4 || code == 5) kontoNeuHolen = true
+            }
+
+            override fun nachricht(topic: String, payload: ByteArray, retained: Boolean) {
+                val text = String(payload, Charsets.UTF_8)
+                arbeiter.execute { if (gen == generation) eingang(topic, text) }
+            }
+
+            override fun getrennt(grund: Throwable?) {
                 arbeiter.execute {
                     if (gen != generation) return@execute
-                    Log.i(TAG, "Verbindung verloren: ${cause?.message}")
+                    Log.w(TAG, "MQTT getrennt", grund)
                     verbunden = false
-                    planeNeuversuch()
-                }
-            }
-
-            override fun messageArrived(topic: String, message: MqttMessage) {
-                val text = String(message.payload, Charsets.UTF_8)
-                arbeiter.execute {
-                    if (gen == generation) eingang(topic, text)
-                }
-            }
-
-            override fun deliveryComplete(token: IMqttDeliveryToken?) {}
-        })
-
-        val optionen = MqttConnectOptions().apply {
-            userName = zugang.token
-            password = zugang.token.toCharArray()
-            isCleanSession = true
-            keepAliveInterval = 60
-            connectionTimeout = 20
-            isAutomaticReconnect = false
-            mqttVersion = MqttConnectOptions.MQTT_VERSION_3_1_1
-            setWill(RosenwegTopics.presence(k.userId), bauePresence(false).toByteArray(), 1, true)
-        }
-
-        c.connect(optionen, null, object : IMqttActionListener {
-            override fun onSuccess(asyncActionToken: IMqttToken?) {
-                arbeiter.execute {
-                    if (gen != generation) return@execute
-                    nachVerbindung(c, k, zugang)
-                }
-            }
-
-            override fun onFailure(asyncActionToken: IMqttToken?, exception: Throwable?) {
-                arbeiter.execute {
-                    if (gen != generation) return@execute
-                    Log.w(TAG, "MQTT-Verbindung fehlgeschlagen: ${exception?.message}")
                     verbindetGerade = false
+                    stoppePingAlarm()
                     planeNeuversuch()
                 }
             }
-        })
+        }, log = { msg, t -> Log.w(TAG, msg, t) })
+        client = c
+        c.verbinde(
+            RwMqttClient.Optionen(
+                clientId = "and_$deviceId",
+                username = zugang.token,
+                password = zugang.token,
+                keepAliveSek = KEEPALIVE_S,
+                will = MqttCodec.Will(RosenwegTopics.presence(k.userId), bauePresence(false).toByteArray(), 1, true),
+            )
+        )
+        // ohne CONNACK in 30 s: abbrechen und neu versuchen
+        arbeiter.schedule({
+            if (gen == generation && !verbunden) {
+                Log.w(TAG, "kein CONNACK in ${CONNACK_WARTEN_S}s")
+                c.abbrechen()
+                verbindetGerade = false
+                planeNeuversuch()
+            }
+        }, CONNACK_WARTEN_S, TimeUnit.SECONDS)
     }
 
-    private fun nachVerbindung(c: MqttAsyncClient, k: RosenwegKonto, zugang: RosenwegApi.MqttZugang) {
+    private fun nachVerbindung(k: RosenwegKonto, zugang: RosenwegApi.MqttZugang) {
+        val c = client ?: return
         verbunden = true
         verbindetGerade = false
         wartenS = 2L
-        try {
-            c.publish(RosenwegTopics.presence(k.userId), bauePresence(true).toByteArray(), 1, true)
-            val filter = ArrayList<String>()
-            filter.add(RosenwegTopics.KRISE)
-            for (chat in chatsNachId.values) {
-                filter.add(RosenwegTopics.empfangsFilter(chat.topicPrefix))
-                filter.add(RosenwegTopics.control(chat.id))
-            }
-            c.subscribe(filter.toTypedArray(), IntArray(filter.size) { 1 })
-        } catch (e: Exception) {
-            Log.w(TAG, "Abonnieren fehlgeschlagen: ${e.message}")
+        c.publish(RosenwegTopics.presence(k.userId), bauePresence(true).toByteArray(), 1, true)
+        val filter = ArrayList<String>()
+        filter.add(RosenwegTopics.KRISE)
+        for (chat in chatsNachId.values) {
+            filter.add(RosenwegTopics.empfangsFilter(chat.topicPrefix))
+            filter.add(RosenwegTopics.control(chat.id))
         }
+        c.subscribe(filter, 1) { codes ->
+            if (codes.any { it == 0x80 }) Log.w(TAG, "Abonnement teilweise abgelehnt: $codes")
+        }
+        planePingAlarm()
+        planePingBackup()
 
         // Neues JWT kurz vor Ablauf (bzw. vor Ablauf des Anlage-Tokens) → neu verbinden
         val bisToken = (zugang.expiresInSek - 120).coerceAtLeast(60)
@@ -379,7 +396,7 @@ class MessengerVerbindung : Service() {
                     if (liste.size < 500) break
                 }
             } catch (e: Exception) {
-                Log.w(TAG, "Verlauf ${chat.id}: ${e.message}")
+                Log.w(TAG, "Verlauf ${chat.id}", e)
             }
         }
         if (geaendert) {
@@ -392,21 +409,83 @@ class MessengerVerbindung : Service() {
         generation++
         verbunden = false
         erneuerung?.cancel(false)
+        pingBackup?.cancel(false)
         val c = client ?: return
         client = null
         try {
-            if (sauber && c.isConnected) {
+            if (sauber && c.istVerbunden) {
                 konto?.let { c.publish(RosenwegTopics.presence(it.userId), bauePresence(false).toByteArray(), 1, true) }
-                c.disconnect(2000).waitForCompletion(2500)
+                c.trenne()
             } else {
-                c.disconnectForcibly(500, 500)
+                c.abbrechen()
             }
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Log.w(TAG, "Trennen", e)
         }
+    }
+
+    // ── Lebenszeichen (PINGREQ) ─────────────────────────────────────────
+
+    private fun pingIntent(): PendingIntent = PendingIntent.getBroadcast(
+        this, 0,
+        Intent(this, RosenwegPingReceiver::class.java).setAction(AKTION_PING),
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+
+    private fun planePingAlarm() {
+        val am = getSystemService(AlarmManager::class.java) ?: return
+        val zeit = SystemClock.elapsedRealtime() + PING_ALLE_MS
         try {
-            c.close()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !am.canScheduleExactAlarms()) {
+                am.setAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP, zeit, pingIntent())
+            } else {
+                am.setExactAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP, zeit, pingIntent())
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Ping-Alarm", e)
+        }
+    }
+
+    private fun stoppePingAlarm() {
+        try {
+            getSystemService(AlarmManager::class.java)?.cancel(pingIntent())
         } catch (_: Exception) {
         }
+    }
+
+    /** Ersatz im Prozess, falls der (ungenaue) Alarm sich verspaetet. */
+    private fun planePingBackup() {
+        pingBackup?.cancel(false)
+        pingBackup = arbeiter.scheduleWithFixedDelay({ pinge(null) }, PING_ALLE_MS, PING_ALLE_MS, TimeUnit.MILLISECONDS)
+    }
+
+    /** Arbeits-Thread: PINGREQ senden, nach 10 s PINGRESP pruefen, sonst neu verbinden. */
+    private fun pinge(wachhalten: PowerManager.WakeLock?) {
+        fun freigeben() {
+            if (wachhalten?.isHeld == true) wachhalten.release()
+        }
+        val c = client
+        if (!verbunden || c == null) {
+            freigeben()
+            return
+        }
+        if (wachhalten != null) planePingAlarm()
+        if (!c.ping()) {
+            freigeben()
+            Log.w(TAG, "PINGREQ nicht sendbar - neu verbinden")
+            verbinde()
+            return
+        }
+        val gen = generation
+        arbeiter.schedule({
+            if (gen == generation && c.pingAusstehend() &&
+                System.currentTimeMillis() - c.letzterPingMs >= PING_ANTWORT_MS
+            ) {
+                Log.w(TAG, "kein PINGRESP - neu verbinden")
+                verbinde()
+            }
+            freigeben()
+        }, PING_ANTWORT_MS, TimeUnit.MILLISECONDS)
     }
 
     private fun planeNeuversuch() {
@@ -454,7 +533,7 @@ class MessengerVerbindung : Service() {
                 }
             }
         } catch (ex: Exception) {
-            Log.w(TAG, "Eingang $topic: ${ex.message}")
+            Log.w(TAG, "Eingang $topic", ex)
         }
     }
 
@@ -476,7 +555,7 @@ class MessengerVerbindung : Service() {
 
     private fun sendeAusstehendeJetzt() {
         val c = client ?: return
-        if (!verbunden || !c.isConnected) return
+        if (!verbunden || !c.istVerbunden) return
         val ich = konto?.userId ?: return
         for (m in speicher.ausstehende()) {
             val chat = chatsNachId[m.chatId]
@@ -485,24 +564,26 @@ class MessengerVerbindung : Service() {
                 continue
             }
             val nutzlast = baueAusgehend(ich, m.clientMsgId ?: continue, m.ts, m.body)
-            try {
-                c.publish(RosenwegTopics.sendeTopic(chat.topicPrefix, ich), nutzlast.toByteArray(Charsets.UTF_8), 1, false,
-                    null, object : IMqttActionListener {
-                        override fun onSuccess(asyncActionToken: IMqttToken?) {
-                            arbeiter.execute {
-                                speicher.setzeStatus(m.rowId, RwStatus.GESENDET)
-                                refreshMessages()
-                            }
-                        }
-
-                        override fun onFailure(asyncActionToken: IMqttToken?, exception: Throwable?) {
-                            // bleibt ausstehend; naechste Verbindung versucht es erneut
-                            Log.w(TAG, "Senden fehlgeschlagen: ${exception?.message}")
-                        }
-                    })
-            } catch (e: Exception) {
-                Log.w(TAG, "Senden: ${e.message}")
+            // QoS 1: PUBACK → gesendet; ohne PUBACK bleibt sie ausstehend und geht bei der
+            // naechsten Verbindung erneut raus (Server entdoppelt am clientMsgId)
+            c.publish(RosenwegTopics.sendeTopic(chat.topicPrefix, ich), nutzlast.toByteArray(Charsets.UTF_8), 1, false) { ok ->
+                if (ok) {
+                    arbeiter.execute {
+                        speicher.setzeStatus(m.rowId, RwStatus.GESENDET)
+                        refreshMessages()
+                    }
+                }
             }
         }
+    }
+}
+
+/** Ping-Alarm: kurzer WakeLock, dann PINGREQ im Dienst. */
+class RosenwegPingReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        val pm = context.getSystemService(PowerManager::class.java) ?: return
+        val wl = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "RosenwegMessenger:mqtt-ping")
+        wl.acquire(15_000L)
+        MessengerVerbindung.pingVomAlarm(context, wl)
     }
 }

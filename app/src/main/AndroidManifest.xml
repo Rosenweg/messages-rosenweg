@@ -193,6 +193,10 @@
             android:foregroundServiceType="dataSync|remoteMessaging" />
 
         <receiver
+            android:name=".rosenweg.RosenwegPingReceiver"
+            android:exported="false" />
+
+        <receiver
             android:name=".rosenweg.RosenwegStartReceiver"
             android:exported="false">
             <intent-filter>

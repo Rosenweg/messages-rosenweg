@@ -54,7 +54,7 @@ data class RosenwegKonto(
                     if (sub.isNullOrEmpty()) null else RosenwegKonto(server, token, bisSek * 1000, sub, jwt.name)
                 }
             } catch (e: Exception) {
-                Log.i(TAG, "kein Messenger-Zugang: ${e.javaClass.simpleName}")
+                Log.i(TAG, "kein Messenger-Zugang", e)
                 null
             }
             zwischenspeicher = neu

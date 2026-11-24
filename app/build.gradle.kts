@@ -153,8 +153,8 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.bundles.room)
     ksp(libs.androidx.room.compiler)
-    // Rosenweg Messenger: MQTT ueber WSS
-    implementation(libs.paho.mqtt)
+    // Rosenweg Messenger: eigener MQTT-Client ueber OkHttp-WebSocket
+    implementation(libs.okhttp)
     testImplementation(libs.junit)
     detektPlugins(libs.compose.detekt)
 }
