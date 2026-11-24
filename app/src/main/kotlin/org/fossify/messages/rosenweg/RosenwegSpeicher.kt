@@ -366,6 +366,7 @@ class RosenwegSpeicher private constructor(context: Context) {
                 rcptVon = d.quittung?.von,
                 plain = d.plain,
                 media = d.mediaJson,
+                priority = if (chat.id == "notfall") "emergency" else d.priority,
             )
             val zeile = dao.neueNachricht(roh)
             nachricht = roh.copy(rowId = zeile, mirroredMessageId = RosenwegIds.nachrichtId(zeile))
@@ -708,6 +709,12 @@ class RosenwegSpeicher private constructor(context: Context) {
         val chat = dao.chatZuThread(threadId) ?: return false
         val ich = eigeneId ?: return false
         dao.quittungGelesenSoll(chat.id, ich) > 0
+    }
+
+    /** nur fuer "Verstanden" beim Notfall */
+    fun quittiereNotfall(chatId: String, clientMsgId: String?): Boolean = synchronized(sperre) {
+        val ich = eigeneId ?: return false
+        dao.quittungNotfallSoll(chatId, ich, clientMsgId) > 0
     }
 
     fun offeneQuittungen(): List<RwMessage> = dao.offeneQuittungen()

@@ -235,6 +235,15 @@ class ThreadActivity : SimpleActivity() {
     /** Rosenweg-Chat (negative Thread-ID): kein SMS, Senden ueber MQTT */
     private val isRosenweg get() = threadId.isRosenwegThread()
 
+    @Volatile
+    private var rwFokus = false
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        rwFokus = hasFocus
+        if (hasFocus && isRosenweg && isActivityVisible) RosenwegHooks.angezeigt(this, threadId)
+    }
+
     /** Rosenweg: Antwort auf diese (gespiegelte) Nachricht, null = keine */
     private var rwAntwortAuf: Long? = null
 
@@ -317,7 +326,6 @@ class ThreadActivity : SimpleActivity() {
             }
 
             markThreadMessagesRead(threadId)
-            RosenwegHooks.angezeigt(this, threadId)
         }
 
         val bottomBarColor = getBottomBarColor()
@@ -633,7 +641,8 @@ class ThreadActivity : SimpleActivity() {
 
     private fun setupAdapter() {
         val latestThreadItems = getThreadItems()
-        if (isRosenweg && isActivityVisible) {
+        // "gelesen" nur, wenn wirklich jemand hinschaut: sichtbar, Fokus, Bildschirm an, entsperrt
+        if (isRosenweg && isActivityVisible && rwFokus) {
             RosenwegHooks.angezeigt(this, threadId)
         }
 

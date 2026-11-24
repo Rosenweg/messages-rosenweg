@@ -91,6 +91,8 @@ data class RwMessage(
     @ColumnInfo(name = "media") val media: String? = null,
     /** eigene Antwort: replyTo-JSON fuer die Nutzlast {clientMsgId, senderId, preview} */
     @ColumnInfo(name = "reply_to") val replyTo: String? = null,
+    /** "emergency" = Notfall (nie automatisch als gelesen quittieren) */
+    @ColumnInfo(name = "priority") val priority: String? = null,
 )
 
 /** Verlauf, den ein anderes Geraet fuer dieses neu verschluesselt hat (bis die Nachricht da ist) */
@@ -153,8 +155,13 @@ interface RosenwegDao {
     @Query("UPDATE rwmessage SET rcpt_gesendet = :stufe WHERE row_id = :rowId AND rcpt_gesendet < :stufe")
     fun quittungGesendet(rowId: Long, stufe: Int)
 
-    @Query("UPDATE rwmessage SET rcpt_soll = 2 WHERE chat_id = :chatId AND sender_id != :ich AND client_msg_id IS NOT NULL AND rcpt_soll < 2")
+    /** automatisches "gelesen" beim Anzeigen – nie fuer Notfaelle (die quittiert nur "Verstanden") */
+    @Query("UPDATE rwmessage SET rcpt_soll = 2 WHERE chat_id = :chatId AND sender_id != :ich AND client_msg_id IS NOT NULL AND rcpt_soll < 2 AND (priority IS NULL OR priority != 'emergency')")
     fun quittungGelesenSoll(chatId: String, ich: String): Int
+
+    /** "Verstanden": Notfall-Nachrichten (oder eine bestimmte) als gelesen quittieren */
+    @Query("UPDATE rwmessage SET rcpt_soll = 2 WHERE chat_id = :chatId AND sender_id != :ich AND client_msg_id IS NOT NULL AND rcpt_soll < 2 AND (:clientMsgId IS NULL OR client_msg_id = :clientMsgId)")
+    fun quittungNotfallSoll(chatId: String, ich: String, clientMsgId: String?): Int
 
     @Query("SELECT * FROM rwmessage WHERE media IS NOT NULL AND deleted = 0 ORDER BY ts DESC LIMIT 500")
     fun mitMedien(): List<RwMessage>
@@ -208,7 +215,7 @@ interface RosenwegDao {
     fun speichereBenutzer(users: List<RwUser>)
 }
 
-@Database(entities = [RwChat::class, RwMessage::class, RwUser::class, RwBackfill::class], version = 4, exportSchema = true)
+@Database(entities = [RwChat::class, RwMessage::class, RwUser::class, RwBackfill::class], version = 5, exportSchema = true)
 abstract class RosenwegDatenbank : RoomDatabase() {
     abstract fun dao(): RosenwegDao
 
@@ -246,6 +253,13 @@ abstract class RosenwegDatenbank : RoomDatabase() {
             object : Migration(3, 4) {
                 override fun migrate(db: SupportSQLiteDatabase) {
                     db.execSQL("ALTER TABLE rwmessage ADD COLUMN reply_to TEXT")
+                }
+            },
+            object : Migration(4, 5) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE rwmessage ADD COLUMN priority TEXT")
+                    // bisheriger Notfall-Kanal gilt als Notfall
+                    db.execSQL("UPDATE rwmessage SET priority = 'emergency' WHERE chat_id = 'notfall'")
                 }
             },
         )

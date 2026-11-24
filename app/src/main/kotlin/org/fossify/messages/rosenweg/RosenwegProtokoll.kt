@@ -262,6 +262,8 @@ fun parseVerlauf(text: String): List<RwNachrichtDaten> {
             mediaName = media?.let { medienName(it) },
             mediaJson = media?.toString(),
             reactions = reactions,
+            priority = m.str("priority"),
+            clear = m.bool("clear") == true,
             quittung = m.obj("receipt")?.let { q ->
                 RwQuittungZahlen(
                     (q.lng("delivered") ?: 0).toInt(),

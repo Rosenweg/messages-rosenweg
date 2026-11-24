@@ -460,8 +460,16 @@ class MessengerVerbindung : Service() {
                 while (seiten++ < 20) {
                     val liste = api.verlauf(chat.id, chat.lastServerId)
                     for (d in liste) {
-                        speicher.nimmAuf(chat, klartext(chat, d), ausVerlauf = true, gelesen = erstimport)
+                        val e = speicher.nimmAuf(chat, klartext(chat, d), ausVerlauf = true, gelesen = erstimport)
                         geaendert = true
+                        // Notfall auch ueber den Verlauf (z.B. neue DM): frisch, fremd, noch nicht quittiert
+                        if (e.neu && e.nachricht.senderId != speicher.eigeneId &&
+                            System.currentTimeMillis() - d.ts < 10 * 60_000 &&
+                            (RosenwegNotfall.istNotfall(chat.id, d.priority) || (chat.id == "notfall" && (d.clear || RosenwegNotfall.istEntwarnung(d.body)))) &&
+                            e.nachricht.rcptSoll < RwQuittung.GELESEN
+                        ) {
+                            RosenwegNotfall.pruefe(this, chat, d, speicher.titel(chat), e.absenderName)
+                        }
                     }
                     chat = speicher.chat(chat.id) ?: break
                     if (liste.size < 500) break

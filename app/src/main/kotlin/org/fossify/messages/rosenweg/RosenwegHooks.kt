@@ -67,16 +67,21 @@ object RosenwegHooks {
         return true
     }
 
-    /** Thread ist sichtbar: "gelesen"-Quittungen fuer fremde Nachrichten (nie fuer eigene). */
+    /** Bildschirm an, entsperrt (und das Fenster hat den Fokus – prueft die Activity) */
+    fun bildschirmBereit(context: Context): Boolean {
+        val pm = context.getSystemService(android.os.PowerManager::class.java)
+        val km = context.getSystemService(android.app.KeyguardManager::class.java)
+        return pm?.isInteractive == true && km?.isKeyguardLocked != true
+    }
+
+    /** Thread ist sichtbar: "gelesen"-Quittungen fuer fremde Nachrichten (nie fuer eigene, nie fuer Notfaelle). */
     fun angezeigt(context: Context, threadId: Long) {
         if (!threadId.isRosenwegThread()) return
+        if (!bildschirmBereit(context)) return
         val app = context.applicationContext
         ensureBackgroundThread {
             val s = RosenwegSpeicher.get(app)
-            // Notfall-Chat geoeffnet = Notfall gelesen: Sirene/Wiederholung aus
-            if (s.chatZuThread(threadId)?.id == RosenwegNotfall.offen(app)?.chatId) {
-                RosenwegNotfall.quittieren(app)
-            }
+            // Notfaelle quittiert nur "Verstanden" (quittiereGelesen laesst sie aus)
             if (s.quittiereGelesen(threadId) && MessengerVerbindung.istAktiv()) {
                 MessengerVerbindung.sendeAusstehende(app)
             }

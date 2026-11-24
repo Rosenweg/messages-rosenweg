@@ -170,6 +170,27 @@ object RosenwegNotfall {
         } catch (e: Exception) {
             Log.w(TAG, "Notfall-Benachrichtigung", e)
         }
+        weckeBildschirm(app)
+        // zusaetzlich direkt starten (laufender Vordergrund-Dienst + Full-Screen-Recht)
+        try {
+            app.startActivity(Intent(app, NotfallActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP))
+        } catch (e: Exception) {
+            Log.w(TAG, "NotfallActivity direkt", e)
+        }
+    }
+
+    /** Bildschirm einschalten (auch bei aus/gesperrt), 30 s */
+    @Suppress("DEPRECATION")
+    private fun weckeBildschirm(context: Context) {
+        try {
+            val pm = context.getSystemService(android.os.PowerManager::class.java)
+            pm.newWakeLock(
+                android.os.PowerManager.FULL_WAKE_LOCK or android.os.PowerManager.ACQUIRE_CAUSES_WAKEUP or android.os.PowerManager.ON_AFTER_RELEASE,
+                "RosenwegMessenger:notfall"
+            ).acquire(30_000L)
+        } catch (e: Exception) {
+            Log.w(TAG, "Bildschirm wecken", e)
+        }
     }
 
     /**
@@ -186,8 +207,7 @@ object RosenwegNotfall {
         Thread {
             try {
                 val s = RosenwegSpeicher.get(app)
-                val chat = s.chat(a?.chatId ?: "notfall")
-                if (chat != null && s.quittiereGelesen(chat.threadId)) MessengerVerbindung.sendeAusstehende(app)
+                if (a != null && s.quittiereNotfall(a.chatId, a.clientMsgId)) MessengerVerbindung.sendeAusstehende(app)
             } catch (e: Exception) {
                 Log.w(TAG, "Quittung", e)
             }
@@ -287,6 +307,7 @@ object RosenwegNotfall {
         @Volatile
         private var faden: Thread? = null
         private var alteLautstaerke = -1
+        private var alterKlingelmodus = -1
         private var alterFilter = -1
 
         fun laeuft() = faden?.isAlive == true
@@ -357,6 +378,15 @@ object RosenwegNotfall {
                     nm.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_ALL)
                 }
                 if (alteLautstaerke < 0) alteLautstaerke = am.getStreamVolume(AudioManager.STREAM_ALARM)
+                if (alterKlingelmodus < 0) alterKlingelmodus = am.ringerMode
+                // lautlos/Vibration: kurz auf normal, damit nichts den Alarm daempft
+                if (am.ringerMode != AudioManager.RINGER_MODE_NORMAL) {
+                    try {
+                        am.ringerMode = AudioManager.RINGER_MODE_NORMAL
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Klingelmodus", e)
+                    }
+                }
                 am.setStreamVolume(AudioManager.STREAM_ALARM, am.getStreamMaxVolume(AudioManager.STREAM_ALARM), 0)
             } catch (e: Exception) {
                 Log.w(TAG, "laut", e)
@@ -367,12 +397,14 @@ object RosenwegNotfall {
             try {
                 val am = context.getSystemService(AudioManager::class.java)
                 if (alteLautstaerke >= 0) am.setStreamVolume(AudioManager.STREAM_ALARM, alteLautstaerke, 0)
+                if (alterKlingelmodus >= 0 && am.ringerMode != alterKlingelmodus) am.ringerMode = alterKlingelmodus
                 if (alterFilter > 0) context.getSystemService(NotificationManager::class.java).setInterruptionFilter(alterFilter)
             } catch (e: Exception) {
                 Log.w(TAG, "zurueck", e)
             } finally {
                 alteLautstaerke = -1
                 alterFilter = -1
+                alterKlingelmodus = -1
             }
         }
 
