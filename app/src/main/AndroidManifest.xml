@@ -229,6 +229,16 @@
             </intent-filter>
         </receiver>
 
+        <!-- Anmeldung auf dem geteilten Telefon: Verbindung sofort starten (nur Rosenweg Geraet sendet). -->
+        <receiver
+            android:name=".rosenweg.RosenwegAnmeldungReceiver"
+            android:exported="true"
+            android:permission="ch.rosenweg4303.permission.ANLAGE">
+            <intent-filter>
+                <action android:name="ch.rosenweg4303.ANGEMELDET" />
+            </intent-filter>
+        </receiver>
+
         <receiver android:name=".receivers.SmsStatusSentReceiver" />
 
         <receiver android:name=".receivers.SmsStatusDeliveredReceiver" />

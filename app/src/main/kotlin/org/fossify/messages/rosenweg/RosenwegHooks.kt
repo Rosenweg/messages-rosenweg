@@ -228,3 +228,24 @@ class RosenwegStartReceiver : BroadcastReceiver() {
         }
     }
 }
+
+
+/**
+ * Rosenweg Geraet meldet eine Anmeldung (ch.rosenweg4303.ANGEMELDET, nur mit der Signatur-Berechtigung
+ * ANLAGE). Nach dem Abmelden sind die App-Daten geloescht und der Messenger gestoppt; ohne diesen
+ * Anstoss liefe die Verbindung erst, wenn jemand die App oeffnet — Notfaelle kaemen nicht an.
+ */
+class RosenwegAnmeldungReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        if (intent.action != "ch.rosenweg4303.ANGEMELDET") return
+        val ende = goAsync()
+        val app = context.applicationContext
+        ensureBackgroundThread {
+            try {
+                MessengerVerbindung.starteWennKonto(app)
+            } finally {
+                ende.finish()
+            }
+        }
+    }
+}
