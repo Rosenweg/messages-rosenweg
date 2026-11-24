@@ -460,7 +460,8 @@ class MessengerVerbindung : Service() {
                 while (seiten++ < 20) {
                     val liste = api.verlauf(chat.id, chat.lastServerId)
                     for (d in liste) {
-                        val e = speicher.nimmAuf(chat, klartext(chat, d), ausVerlauf = true, gelesen = erstimport)
+                        val dk = klartext(chat, d)
+                        val e = speicher.nimmAuf(chat, dk, ausVerlauf = true, gelesen = erstimport)
                         geaendert = true
                         // Notfall auch ueber den Verlauf (z.B. neue DM): frisch, fremd, noch nicht quittiert
                         if (e.neu && e.nachricht.senderId != speicher.eigeneId &&
@@ -468,7 +469,7 @@ class MessengerVerbindung : Service() {
                             (RosenwegNotfall.istNotfall(chat.id, d.priority) || (chat.id == "notfall" && (d.clear || RosenwegNotfall.istEntwarnung(d.body)))) &&
                             e.nachricht.rcptSoll < RwQuittung.GELESEN
                         ) {
-                            RosenwegNotfall.pruefe(this, chat, d, speicher.titel(chat), e.absenderName)
+                            RosenwegNotfall.pruefe(this, chat, dk.copy(body = e.nachricht.body ?: dk.body), speicher.titel(chat), e.absenderName)
                         }
                     }
                     chat = speicher.chat(chat.id) ?: break
@@ -759,7 +760,8 @@ class MessengerVerbindung : Service() {
                     val (prefix, _) = RosenwegTopics.nachrichtTopic(topic) ?: return
                     val chat = chatsNachPrefix[prefix] ?: return
                     val d = parseLiveNachricht(topic, text) ?: return
-                    val e = speicher.nimmAuf(speicher.chat(chat.id) ?: chat, klartext(chat, d), ausVerlauf = false, gelesen = false)
+                    val dk = klartext(chat, d)
+                    val e = speicher.nimmAuf(speicher.chat(chat.id) ?: chat, dk, ausVerlauf = false, gelesen = false)
                     refreshMessages()
                     refreshConversations()
                     RosenwegLive.nachrichtVon(chat.id, e.nachricht.senderId)
@@ -769,7 +771,7 @@ class MessengerVerbindung : Service() {
                         val eigen = e.nachricht.senderId == speicher.eigeneId
                         val istEntwarnung = chat.id == "notfall" && (d.clear || RosenwegNotfall.istEntwarnung(d.body))
                         if (!eigen || istEntwarnung) {
-                            RosenwegNotfall.pruefe(this, chat, d, speicher.titel(chat), e.absenderName)
+                            RosenwegNotfall.pruefe(this, chat, dk.copy(body = e.nachricht.body ?: dk.body), speicher.titel(chat), e.absenderName)
                         }
                     }
                     if (e.neu && e.nachricht.senderId != speicher.eigeneId) {

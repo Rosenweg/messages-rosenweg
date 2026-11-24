@@ -131,8 +131,10 @@ object RosenwegNotfall {
     var letzterAlarm: Triple<String, String, String>? = null
         private set
 
-    fun alarm(context: Context, titel: String, absender: String, text: String) {
+    fun alarm(context: Context, titel0: String, absender: String, text: String) {
         val app = context.applicationContext
+        // DM: Titel = Gegenueber = Absender → nur einmal zeigen
+        val titel = if (titel0 == absender) "" else titel0
         letzterAlarm = Triple(titel, absender, text)
         Log.w(TAG, "NOTFALL von $absender in $titel")
         Sirene.start(app)
@@ -154,7 +156,7 @@ object RosenwegNotfall {
         )
         val n = NotificationCompat.Builder(app, KANAL_NOTFALL)
             .setSmallIcon(R.drawable.ic_messenger)
-            .setContentTitle("🚨 NOTFALL – $titel")
+            .setContentTitle(if (titel.isBlank()) "🚨 NOTFALL – $absender" else "🚨 NOTFALL – $titel")
             .setContentText(text.ifBlank { absender })
             .setStyle(NotificationCompat.BigTextStyle().bigText("$absender: $text"))
             .setPriority(NotificationCompat.PRIORITY_MAX)
