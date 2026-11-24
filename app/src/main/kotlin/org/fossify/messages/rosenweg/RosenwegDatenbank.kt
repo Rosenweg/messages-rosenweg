@@ -163,6 +163,9 @@ interface RosenwegDao {
     @Query("UPDATE rwmessage SET rcpt_soll = 2 WHERE chat_id = :chatId AND sender_id != :ich AND client_msg_id IS NOT NULL AND rcpt_soll < 2 AND (:clientMsgId IS NULL OR client_msg_id = :clientMsgId)")
     fun quittungNotfallSoll(chatId: String, ich: String, clientMsgId: String?): Int
 
+    @Query("UPDATE rwmessage SET read = 1 WHERE chat_id = :chatId AND read = 0 AND server_id IS NOT NULL AND server_id <= :bis")
+    fun gelesenBis(chatId: String, bis: Long): Int
+
     @Query("SELECT * FROM rwmessage WHERE media IS NOT NULL AND deleted = 0 ORDER BY ts DESC LIMIT 500")
     fun mitMedien(): List<RwMessage>
 

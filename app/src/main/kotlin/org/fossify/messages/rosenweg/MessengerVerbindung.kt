@@ -570,6 +570,8 @@ class MessengerVerbindung : Service() {
 
     private var inboxGeplant: ScheduledFuture<*>? = null
 
+    private fun notificationManagerOderNull() = getSystemService(NotificationManager::class.java)
+
     private var backfillGeschoben = 0L
 
     /**
@@ -751,10 +753,19 @@ class MessengerVerbindung : Service() {
                 }
 
                 topic.startsWith("inbox/") -> {
-                    // neues/entferntes Gespraech: (entprellt) Token + Gespraeche neu, neu verbinden
                     Log.i(TAG, "inbox: $text")
-                    inboxGeplant?.cancel(false)
-                    inboxGeplant = arbeiter.schedule({ verbinde() }, 1500, TimeUnit.MILLISECONDS)
+                    when (val i = parseInbox(text)) {
+                        // auf einem anderen Geraet gelesen: nur ungelesen zuruecksetzen
+                        is RwInbox.Gelesen -> speicher.chatGelesen(i.convId, i.lastReadMsgId)?.let { chat ->
+                            notificationManagerOderNull()?.cancel(chat.threadId.hashCode())
+                            refreshConversations()
+                        }
+                        // neues/entferntes Gespraech: (entprellt) Token + Gespraeche neu, neu verbinden
+                        RwInbox.Gespraeche -> {
+                            inboxGeplant?.cancel(false)
+                            inboxGeplant = arbeiter.schedule({ verbinde() }, 1500, TimeUnit.MILLISECONDS)
+                        }
+                    }
                 }
 
                 topic.startsWith("keys/") -> {

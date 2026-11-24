@@ -67,6 +67,34 @@ object RosenwegHooks {
         return true
     }
 
+    private val gelesenPlaner = java.util.concurrent.Executors.newSingleThreadScheduledExecutor()
+    private val gelesenGeplant = java.util.concurrent.ConcurrentHashMap<String, java.util.concurrent.ScheduledFuture<*>>()
+
+    /** POST /api/conversations/:id/read, je Chat auf 1.5 s entprellt */
+    fun gelesenMelden(context: Context, chatId: String, sofort: Boolean = false) {
+        val app = context.applicationContext
+        gelesenGeplant.remove(chatId)?.cancel(false)
+        gelesenGeplant[chatId] = gelesenPlaner.schedule({
+            gelesenGeplant.remove(chatId)
+            try {
+                RosenwegKonto.hole(app)?.let { RosenwegApi(it).gelesen(chatId) }
+            } catch (e: Exception) {
+                Log.w("RosenwegHooks", "Gelesen-Stand $chatId", e)
+            }
+        }, if (sofort) 0L else 1500L, java.util.concurrent.TimeUnit.MILLISECONDS)
+    }
+
+    /** verstaendlicher Grund fuer eine fehlgeschlagene Aktion */
+    fun grund(e: Exception): String = when {
+        e is RosenwegApi.HttpFehler && !e.serverText.isNullOrBlank() -> e.serverText
+        e is RosenwegApi.HttpFehler && e.code == 403 -> "keine Berechtigung"
+        e is RosenwegApi.HttpFehler && e.code == 404 -> "Nachricht nicht gefunden"
+        e is RosenwegApi.HttpFehler && e.code == 401 -> "nicht angemeldet"
+        e is RosenwegApi.HttpFehler -> "Server-Fehler ${e.code}"
+        e is java.io.IOException -> "keine Verbindung zum Server"
+        else -> e.message ?: e.javaClass.simpleName
+    }
+
     /** Bildschirm an, entsperrt (und das Fenster hat den Fokus – prueft die Activity) */
     fun bildschirmBereit(context: Context): Boolean {
         val pm = context.getSystemService(android.os.PowerManager::class.java)
@@ -85,6 +113,9 @@ object RosenwegHooks {
             if (s.quittiereGelesen(threadId) && MessengerVerbindung.istAktiv()) {
                 MessengerVerbindung.sendeAusstehende(app)
             }
+            // Gelesen-Stand fuer alle Geraete (entprellt), nie solange ein Notfall offen ist
+            val chat = s.chatZuThread(threadId)
+            if (chat != null && !s.hatOffenenNotfall(chat.id)) gelesenMelden(app, chat.id)
         }
     }
 
@@ -138,7 +169,7 @@ object RosenwegHooks {
                 block(RosenwegApi(konto), chat, id)
             } catch (e: Exception) {
                 Log.w("RosenwegHooks", fehlerText, e)
-                app.toast(fehlerText)
+                app.toast("$fehlerText – ${grund(e)}")
             }
         }
     }
@@ -166,7 +197,7 @@ object RosenwegHooks {
             true
         } catch (e: Exception) {
             Log.w("RosenwegHooks", "Anhang senden", e)
-            context.toast("Anhang nicht gesendet: ${e.message ?: e.javaClass.simpleName}")
+            context.toast("Anhang nicht gesendet – ${grund(e)}")
             false
         }
     }

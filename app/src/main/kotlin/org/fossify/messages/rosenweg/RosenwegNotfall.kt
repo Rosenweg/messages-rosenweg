@@ -220,6 +220,8 @@ object RosenwegNotfall {
             try {
                 val s = RosenwegSpeicher.get(app)
                 if (a != null && s.quittiereNotfall(a.chatId, a.clientMsgId)) MessengerVerbindung.sendeAusstehende(app)
+                // "Verstanden" = gelesen, auch fuer den Gelesen-Stand aller Geraete
+                if (a != null) RosenwegHooks.gelesenMelden(app, a.chatId, sofort = true)
             } catch (e: Exception) {
                 Log.w(TAG, "Quittung", e)
             }

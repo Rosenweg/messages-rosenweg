@@ -337,6 +337,9 @@ data class RwGespraechDaten(
     val updatedAt: Long?,
     /** eigenes Gruppen-/Kanal-Logo (metadata.avatar, data:-URL) */
     val avatar: String? = null,
+    /** Gelesen-Stand ueber alle Geraete */
+    val unread: Int? = null,
+    val lastReadMsgId: Long? = null,
 )
 
 fun parseGespraeche(text: String): List<RwGespraechDaten> {
@@ -363,6 +366,8 @@ fun parseGespraeche(text: String): List<RwGespraechDaten> {
             participants = meta?.arr("participants")?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull?.let { p -> normiereId(p) } } ?: emptyList(),
             updatedAt = parseZeit(c["updated_at"]),
             avatar = meta?.str("avatar")?.takeIf { it.isNotBlank() },
+            unread = c.lng("unread")?.toInt(),
+            lastReadMsgId = c.lng("last_read_msg_id"),
         )
     } ?: emptyList()
 }
@@ -595,4 +600,22 @@ fun parseBackfill(text: String): List<RwBackfillEintrag> {
         val buendel = if (ct is JsonPrimitive) ct.contentOrNull ?: return@mapNotNull null else ct.toString()
         RwBackfillEintrag(b.str("convId") ?: return@mapNotNull null, b.lng("origMsgId") ?: return@mapNotNull null, buendel)
     } ?: emptyList()
+}
+
+// ── inbox/<uid> ─────────────────────────────────────────────────────────
+
+sealed class RwInbox {
+    /** Gespraech neu/entfernt/Mitglieder → Token + Liste neu, neu verbinden */
+    object Gespraeche : RwInbox()
+
+    /** auf einem anderen Geraet gelesen → nur ungelesen zuruecksetzen */
+    data class Gelesen(val convId: String, val lastReadMsgId: Long?) : RwInbox()
+}
+
+fun parseInbox(payload: String): RwInbox {
+    val o = parseJson(payload) as? JsonObject ?: return RwInbox.Gespraeche
+    return when (o.str("type")) {
+        "read" -> o.str("convId")?.let { RwInbox.Gelesen(it, o.lng("lastReadMsgId")) } ?: RwInbox.Gespraeche
+        else -> RwInbox.Gespraeche
+    }
 }

@@ -121,3 +121,15 @@ class SchluesselAuswahlTest {
         org.junit.Assert.assertEquals(mapOf("dev_a" to "NEU", "dev_b" to "B"), k)
     }
 }
+
+class InboxTest {
+    @org.junit.Test
+    fun inboxArten() {
+        org.junit.Assert.assertEquals(RwInbox.Gelesen("dm-1", 42), parseInbox("""{"type":"read","convId":"dm-1","lastReadMsgId":42,"ts":1}"""))
+        org.junit.Assert.assertEquals(RwInbox.Gespraeche, parseInbox("""{"type":"conversations","action":"added","convId":"g"}"""))
+        org.junit.Assert.assertEquals(RwInbox.Gespraeche, parseInbox("kaputt"))
+        val g = parseGespraeche("""{"conversations":[{"id":"g","kind":"group","topic_prefix":"group/g","unread":3,"last_read_msg_id":"17"}]}""")
+        org.junit.Assert.assertEquals(3, g[0].unread)
+        org.junit.Assert.assertEquals(17L, g[0].lastReadMsgId)
+    }
+}

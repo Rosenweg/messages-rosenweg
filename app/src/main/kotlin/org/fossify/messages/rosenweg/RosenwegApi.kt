@@ -14,7 +14,7 @@ import java.util.concurrent.TimeUnit
 /** REST am message-store (chat.rosenweg4303.ch/api/...), blockierend. */
 class RosenwegApi(private val konto: RosenwegKonto) {
 
-    class HttpFehler(val code: Int, msg: String) : IOException(msg)
+    class HttpFehler(val code: Int, msg: String, val serverText: String? = null) : IOException(msg)
 
     data class MqttZugang(val token: String, val expiresInSek: Long, val angaben: JwtAngaben?)
 
@@ -60,6 +60,11 @@ class RosenwegApi(private val konto: RosenwegKonto) {
     }
 
     private fun enc(s: String) = URLEncoder.encode(s, "UTF-8").replace("+", "%20")
+
+    /** Gelesen-Stand ueber alle Geraete: last_read auf die neueste Nachricht */
+    fun gelesen(chatId: String) {
+        anfrage("POST", "/api/conversations/${enc(chatId)}/read")
+    }
 
     // ── Medien ───────────────────────────────────────────────────────────
 
@@ -191,7 +196,14 @@ class RosenwegApi(private val konto: RosenwegKonto) {
             .method(methode, rumpf)
             .build()
         http.newCall(anfrage).execute().use { r ->
-            if (!r.isSuccessful) throw HttpFehler(r.code, "$methode $pfad → HTTP ${r.code}")
+            if (!r.isSuccessful) {
+                val fehler = try {
+                    (parseJson(r.body?.string() ?: "") as? JsonObject)?.str("error")
+                } catch (_: Exception) {
+                    null
+                }
+                throw HttpFehler(r.code, "$methode $pfad → HTTP ${r.code}", fehler)
+            }
             return r.body?.string() ?: ""
         }
     }

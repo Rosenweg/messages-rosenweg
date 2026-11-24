@@ -271,6 +271,8 @@ class RosenwegSpeicher private constructor(context: Context) {
             } else if (alt != chat) {
                 dao.aendereChat(chat)
             }
+            // Gelesen-Stand des Servers (andere Geraete) uebernehmen
+            uebernimmGelesen(chat, g.unread, g.lastReadMsgId)
             spiegleGespraech(chat)
             ergebnis.add(chat)
         }
@@ -729,6 +731,29 @@ class RosenwegSpeicher private constructor(context: Context) {
         if (vorher != nachher) spiegleNachricht(chat, neu)
         vorher != nachher
     }
+
+    private fun uebernimmGelesen(chat: RwChat, unread: Int?, lastRead: Long?) {
+        var n = 0
+        if (unread == 0) n += dao.markiereGelesen(chat.id).let { 1 }
+        else if (lastRead != null && lastRead > 0) n += dao.gelesenBis(chat.id, lastRead)
+        if (n > 0 && unread == 0) app.messagesDB.markThreadRead(chat.threadId)
+    }
+
+    /** inbox type "read": auf einem anderen Geraet gelesen → hier nicht mehr ungelesen */
+    fun chatGelesen(convId: String, lastRead: Long?): RwChat? = synchronized(sperre) {
+        val chat = dao.chat(convId) ?: return null
+        if (lastRead != null && lastRead > 0) dao.gelesenBis(chat.id, lastRead) else dao.markiereGelesen(chat.id)
+        if (dao.nachrichten(chat.id).none { !it.read && it.status == RwStatus.EMPFANGEN }) {
+            app.messagesDB.markThreadRead(chat.threadId)
+            app.conversationsDB.markRead(chat.threadId)
+        }
+        spiegleGespraech(chat)
+        chat
+    }
+
+    /** Notfall noch offen (fremde Notfall-Nachricht ohne "gelesen")? Dann kein automatisches /read */
+    fun hatOffenenNotfall(chatId: String): Boolean =
+        dao.nachrichten(chatId).any { it.priority == "emergency" && it.senderId != eigeneId && it.rcptSoll < RwQuittung.GELESEN && !it.deleted }
 
     /** Thread wird angezeigt: fuer alle fremden Nachrichten "gelesen" vormerken. */
     fun quittiereGelesen(threadId: Long): Boolean = synchronized(sperre) {
