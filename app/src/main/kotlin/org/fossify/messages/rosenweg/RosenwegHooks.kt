@@ -74,6 +74,17 @@ object RosenwegHooks {
         return true
     }
 
+    /** Thread ist sichtbar: "gelesen"-Quittungen fuer fremde Nachrichten (nie fuer eigene). */
+    fun angezeigt(context: Context, threadId: Long) {
+        if (!threadId.isRosenwegThread()) return
+        val app = context.applicationContext
+        ensureBackgroundThread {
+            if (RosenwegSpeicher.get(app).quittiereGelesen(threadId) && MessengerVerbindung.istAktiv()) {
+                MessengerVerbindung.sendeAusstehende(app)
+            }
+        }
+    }
+
     fun markiereThreadGelesen(context: Context, threadId: Long) =
         RosenwegSpeicher.get(context).markiereThreadGelesen(threadId)
 

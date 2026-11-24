@@ -23,6 +23,7 @@ import androidx.core.content.ContextCompat
 import org.fossify.commons.helpers.ensureBackgroundThread
 import org.fossify.messages.R
 import org.fossify.messages.activities.MainActivity
+import org.fossify.messages.extensions.getNotificationBitmap
 import org.fossify.messages.extensions.showReceivedMessageNotification
 import org.fossify.messages.helpers.refreshConversations
 import org.fossify.messages.helpers.refreshMessages
@@ -259,7 +260,10 @@ class MessengerVerbindung : Service() {
 
             if (System.currentTimeMillis() - verzeichnisGeholt > VERZEICHNIS_ALTER_MS) {
                 try {
-                    speicher.speichereVerzeichnis(api.verzeichnis())
+                    if (speicher.speichereVerzeichnis(api.verzeichnis(), leseJwt(k.token)?.avatar)) {
+                        refreshMessages()
+                        refreshConversations()
+                    }
                     verzeichnisGeholt = System.currentTimeMillis()
                 } catch (e: Exception) {
                     Log.w(TAG, "Verzeichnis", e)
@@ -359,6 +363,7 @@ class MessengerVerbindung : Service() {
         for (chat in chatsNachId.values) {
             filter.add(RosenwegTopics.empfangsFilter(chat.topicPrefix))
             filter.add(RosenwegTopics.control(chat.id))
+            filter.add(RwQuittung.filter(chat.id))
         }
         c.subscribe(filter, 1) { codes ->
             if (codes.any { it == 0x80 }) Log.w(TAG, "Abonnement teilweise abgelehnt: $codes")
@@ -408,6 +413,7 @@ class MessengerVerbindung : Service() {
     private fun trenne(sauber: Boolean) {
         generation++
         verbunden = false
+        quittungenUnterwegs.clear()
         erneuerung?.cancel(false)
         pingBackup?.cancel(false)
         val c = client ?: return
@@ -506,6 +512,12 @@ class MessengerVerbindung : Service() {
                     Log.i(TAG, "sys/crisis: $text")
                 }
 
+                topic.startsWith("receipt/") -> {
+                    val q = RwQuittung.parse(topic, text) ?: return
+                    if (q.chatId !in chatsNachId) return
+                    if (speicher.nimmQuittung(q)) refreshMessages()
+                }
+
                 topic.startsWith("control/") -> {
                     val chat = chatsNachId[topic.removePrefix("control/")] ?: return
                     val s = parseSteuerung(text) ?: return
@@ -528,6 +540,7 @@ class MessengerVerbindung : Service() {
                     refreshMessages()
                     refreshConversations()
                     if (e.neu && e.nachricht.senderId != speicher.eigeneId) {
+                        sendeQuittungen()
                         benachrichtige(e)
                     }
                 }
@@ -547,16 +560,51 @@ class MessengerVerbindung : Service() {
             senderName = absender,
             body = e.anzeige,
             threadId = e.chat.threadId,
-            bitmap = null,
+            bitmap = getNotificationBitmap(
+                speicher.personenBildFuer(e.nachricht.senderId).ifEmpty { speicher.gespraechsBild(e.chat) }
+            ),
         )
     }
 
     // ── Senden (Arbeits-Thread) ─────────────────────────────────────────
 
+    /** Quittungen in Arbeit (rowId → Stufe), damit nichts doppelt rausgeht */
+    private val quittungenUnterwegs = HashMap<Long, Int>()
+
+    /** Arbeits-Thread: "zugestellt"/"gelesen" fuer fremde Nachrichten an receipt/<conv>/<ich>. */
+    private fun sendeQuittungen() {
+        val c = client ?: return
+        if (!verbunden || !c.istVerbunden) return
+        val ich = konto?.userId ?: return
+        for (m in speicher.offeneQuittungen()) {
+            if (m.senderId == ich) {
+                speicher.quittungGesendet(m.rowId, 2)
+                continue
+            }
+            val id = m.clientMsgId ?: continue
+            if ((quittungenUnterwegs[m.rowId] ?: 0) >= m.rcptSoll) continue
+            if (m.chatId !in chatsNachId) continue
+            quittungenUnterwegs[m.rowId] = m.rcptSoll
+            val topic = RwQuittung.topic(m.chatId, ich)
+            // "gelesen" schliesst "zugestellt" ein; fehlt "zugestellt" noch, zuerst senden
+            if (m.rcptGesendet < RwQuittung.ZUGESTELLT && m.rcptSoll >= RwQuittung.GELESEN) {
+                c.publish(topic, RwQuittung.nutzlast(id, RwQuittung.ZUGESTELLT).toByteArray(), 1, false)
+            }
+            val stufe = m.rcptSoll
+            c.publish(topic, RwQuittung.nutzlast(id, stufe).toByteArray(), 1, false) { ok ->
+                arbeiter.execute {
+                    if (quittungenUnterwegs[m.rowId] == stufe) quittungenUnterwegs.remove(m.rowId)
+                    if (ok) speicher.quittungGesendet(m.rowId, stufe)
+                }
+            }
+        }
+    }
+
     private fun sendeAusstehendeJetzt() {
         val c = client ?: return
         if (!verbunden || !c.istVerbunden) return
         val ich = konto?.userId ?: return
+        sendeQuittungen()
         for (m in speicher.ausstehende()) {
             val chat = chatsNachId[m.chatId]
             if (chat == null || chat.kind == "dm" || !chat.canWrite || m.body == null) {

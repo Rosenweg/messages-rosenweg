@@ -14,6 +14,7 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.Update
 import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 
 /**
  * Eigener Speicher des Rosenweg Messengers (rosenweg.db). Bewusst NICHT in
@@ -38,6 +39,8 @@ data class RwChat(
     @ColumnInfo(name = "last_server_id") val lastServerId: Long = 0,
     @ColumnInfo(name = "can_write") val canWrite: Boolean = true,
     @ColumnInfo(name = "thread_id") val threadId: Long = 0,
+    /** eigenes Logo (metadata.avatar) als data:-URL, null = Standardlogo */
+    @ColumnInfo(name = "avatar") val avatar: String? = null,
 )
 
 /** Eigener Zustand ausgehender Nachrichten */
@@ -73,12 +76,23 @@ data class RwMessage(
     @ColumnInfo(name = "status") val status: Int,
     @ColumnInfo(name = "read") val read: Boolean,
     @ColumnInfo(name = "mirrored_message_id") val mirroredMessageId: Long = 0,
+    // Quittungen: fuer fremde Nachrichten was wir senden sollen/gesendet haben (1 zugestellt, 2 gelesen)
+    @ColumnInfo(name = "rcpt_soll", defaultValue = "0") val rcptSoll: Int = 0,
+    @ColumnInfo(name = "rcpt_gesendet", defaultValue = "0") val rcptGesendet: Int = 0,
+    // fuer eigene Nachrichten: wer zugestellt/gelesen hat (JSON-Listen) und Zahlen aus dem Verlauf
+    @ColumnInfo(name = "rcpt_zugestellt") val rcptZugestellt: String? = null,
+    @ColumnInfo(name = "rcpt_gelesen") val rcptGelesen: String? = null,
+    @ColumnInfo(name = "rcpt_n_zugestellt", defaultValue = "0") val rcptNZugestellt: Int = 0,
+    @ColumnInfo(name = "rcpt_n_gelesen", defaultValue = "0") val rcptNGelesen: Int = 0,
+    @ColumnInfo(name = "rcpt_von") val rcptVon: Int? = null,
 )
 
 @Entity(tableName = "user")
 data class RwUser(
     @PrimaryKey @ColumnInfo(name = "id") val id: String,
     @ColumnInfo(name = "name") val name: String,
+    /** data:-URL oder URL aus /api/directory */
+    @ColumnInfo(name = "avatar") val avatar: String? = null,
 )
 
 @Dao
@@ -119,6 +133,15 @@ interface RosenwegDao {
     @Query("SELECT * FROM rwmessage WHERE row_id = :rowId")
     fun nachrichtZuZeile(rowId: Long): RwMessage?
 
+    @Query("SELECT * FROM rwmessage WHERE rcpt_soll > rcpt_gesendet AND client_msg_id IS NOT NULL ORDER BY ts LIMIT 500")
+    fun offeneQuittungen(): List<RwMessage>
+
+    @Query("UPDATE rwmessage SET rcpt_gesendet = :stufe WHERE row_id = :rowId AND rcpt_gesendet < :stufe")
+    fun quittungGesendet(rowId: Long, stufe: Int)
+
+    @Query("UPDATE rwmessage SET rcpt_soll = 2 WHERE chat_id = :chatId AND sender_id != :ich AND client_msg_id IS NOT NULL AND rcpt_soll < 2")
+    fun quittungGelesenSoll(chatId: String, ich: String): Int
+
     @Query("SELECT * FROM rwmessage WHERE status = 1 ORDER BY ts")
     fun ausstehende(): List<RwMessage>
 
@@ -144,7 +167,7 @@ interface RosenwegDao {
     fun speichereBenutzer(users: List<RwUser>)
 }
 
-@Database(entities = [RwChat::class, RwMessage::class, RwUser::class], version = 1, exportSchema = true)
+@Database(entities = [RwChat::class, RwMessage::class, RwUser::class], version = 2, exportSchema = true)
 abstract class RosenwegDatenbank : RoomDatabase() {
     abstract fun dao(): RosenwegDao
 
@@ -153,7 +176,23 @@ abstract class RosenwegDatenbank : RoomDatabase() {
         private var instanz: RosenwegDatenbank? = null
 
         /** Kuenftige Schemaaenderungen hier als echte Migration ergaenzen (kein destruktiver Rueckfall). */
-        private val MIGRATIONEN = arrayOf<Migration>()
+        private val MIGRATIONEN = arrayOf<Migration>(
+            object : Migration(1, 2) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE chat ADD COLUMN avatar TEXT")
+                    db.execSQL("ALTER TABLE user ADD COLUMN avatar TEXT")
+                    db.execSQL("ALTER TABLE rwmessage ADD COLUMN rcpt_soll INTEGER NOT NULL DEFAULT 0")
+                    db.execSQL("ALTER TABLE rwmessage ADD COLUMN rcpt_gesendet INTEGER NOT NULL DEFAULT 0")
+                    db.execSQL("ALTER TABLE rwmessage ADD COLUMN rcpt_zugestellt TEXT")
+                    db.execSQL("ALTER TABLE rwmessage ADD COLUMN rcpt_gelesen TEXT")
+                    db.execSQL("ALTER TABLE rwmessage ADD COLUMN rcpt_n_zugestellt INTEGER NOT NULL DEFAULT 0")
+                    db.execSQL("ALTER TABLE rwmessage ADD COLUMN rcpt_n_gelesen INTEGER NOT NULL DEFAULT 0")
+                    db.execSQL("ALTER TABLE rwmessage ADD COLUMN rcpt_von INTEGER")
+                    // Bestehender Verlauf: keine nachtraegliche Quittungs-Flut
+                    db.execSQL("UPDATE rwmessage SET rcpt_soll = 2, rcpt_gesendet = 2")
+                }
+            },
+        )
 
         fun get(context: Context): RosenwegDatenbank =
             instanz ?: synchronized(this) {

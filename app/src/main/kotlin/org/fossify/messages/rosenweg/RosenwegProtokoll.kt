@@ -119,6 +119,8 @@ data class JwtAngaben(
     /** immer als Text (das JWT kann die ID als Zahl tragen) */
     val sub: String?,
     val name: String?,
+    /** eigenes Bild (data:-URL oder URL), falls das Anlage-Token eines traegt */
+    val avatar: String?,
     val exp: Long?,
     val pubTopics: List<String>,
     val subTopics: List<String>,
@@ -138,6 +140,7 @@ fun leseJwt(token: String): JwtAngaben? {
     return JwtAngaben(
         sub = o.str("sub")?.let { normiereId(it) },
         name = o.str("name")?.takeIf { it.isNotBlank() },
+        avatar = (o.str("avatar") ?: o.str("avatar_url") ?: o.str("picture"))?.takeIf { it.isNotBlank() },
         exp = o.lng("exp"),
         pubTopics = liste("pub_topics"),
         subTopics = liste("sub_topics"),
@@ -193,7 +196,11 @@ data class RwNachrichtDaten(
     val clear: Boolean = false,
     /** emoji → Benutzer-IDs */
     val reactions: Map<String, List<String>> = emptyMap(),
+    /** nur eigene Nachrichten im Verlauf: "receipt":{"delivered":n,"read":n,"of":m} */
+    val quittung: RwQuittungZahlen? = null,
 )
+
+data class RwQuittungZahlen(val zugestellt: Int, val gelesen: Int, val von: Int)
 
 /** Live-Nachricht; Absender kommt aus dem Topic, nie aus payload.senderId. */
 fun parseLiveNachricht(topic: String, payload: String, jetztMs: Long = System.currentTimeMillis()): RwNachrichtDaten? {
@@ -246,6 +253,13 @@ fun parseVerlauf(text: String): List<RwNachrichtDaten> {
             replyPreview = replyObj?.str("preview"),
             mediaName = media?.let { it.str("filename") ?: it.str("mtype") ?: "Datei" },
             reactions = reactions,
+            quittung = m.obj("receipt")?.let { q ->
+                RwQuittungZahlen(
+                    (q.lng("delivered") ?: 0).toInt(),
+                    (q.lng("read") ?: 0).toInt(),
+                    (q.lng("of") ?: 0).toInt(),
+                )
+            },
         )
     } ?: emptyList()
 }
@@ -276,6 +290,8 @@ data class RwGespraechDaten(
     val role: String?,
     val participants: List<String>,
     val updatedAt: Long?,
+    /** eigenes Gruppen-/Kanal-Logo (metadata.avatar, data:-URL) */
+    val avatar: String? = null,
 )
 
 fun parseGespraeche(text: String): List<RwGespraechDaten> {
@@ -301,17 +317,20 @@ fun parseGespraeche(text: String): List<RwGespraechDaten> {
             role = c.str("role"),
             participants = meta?.arr("participants")?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull?.let { p -> normiereId(p) } } ?: emptyList(),
             updatedAt = parseZeit(c["updated_at"]),
+            avatar = meta?.str("avatar")?.takeIf { it.isNotBlank() },
         )
     } ?: emptyList()
 }
 
-fun parseVerzeichnis(text: String): Map<String, String> {
+data class RwPerson(val name: String, val avatar: String?)
+
+fun parseVerzeichnis(text: String): Map<String, RwPerson> {
     val o = parseJson(text) as? JsonObject ?: return emptyMap()
-    val result = LinkedHashMap<String, String>()
+    val result = LinkedHashMap<String, RwPerson>()
     o.arr("users")?.forEach { e ->
         val u = e as? JsonObject ?: return@forEach
         val id = u.str("id")?.let { normiereId(it) } ?: return@forEach
-        result[id] = u.str("name") ?: u.str("email") ?: id
+        result[id] = RwPerson(u.str("name") ?: u.str("email") ?: id, u.str("avatar")?.takeIf { it.isNotBlank() })
     }
     return result
 }
@@ -401,4 +420,53 @@ fun anzeigeText(
         sb.append(reactions.entries.joinToString(" ") { (emoji, users) -> "$emoji${users.size}" })
     }
     return sb.toString()
+}
+
+// ── Quittungen (WhatsApp-Haken) ─────────────────────────────────────────
+
+/** WhatsApp-Blau fuer "gelesen" */
+const val RW_HAKEN_BLAU = 0xFF34B7F1.toInt()
+
+object RwQuittung {
+    const val ZUGESTELLT = 1
+    const val GELESEN = 2
+
+    fun topic(chatId: String, eigeneId: String) = "receipt/$chatId/$eigeneId"
+    fun filter(chatId: String) = "receipt/$chatId/#"
+
+    fun nutzlast(clientMsgId: String, stufe: Int, ts: Long = System.currentTimeMillis()): String =
+        buildJsonObject {
+            put("msgId", clientMsgId)
+            put("state", if (stufe >= GELESEN) "read" else "delivered")
+            put("ts", ts)
+        }.toString()
+
+    data class Eingang(val chatId: String, val userId: String, val clientMsgId: String, val stufe: Int)
+
+    /** "receipt/<conv>/<uid>" + {"msgId","state"} → Eingang (Absender = letzte Topic-Ebene) */
+    fun parse(topic: String, payload: String): Eingang? {
+        val teile = topic.split('/')
+        if (teile.size < 3 || teile[0] != "receipt") return null
+        val o = parseJson(payload) as? JsonObject ?: return null
+        val msgId = o.str("msgId") ?: return null
+        val stufe = when (o.str("state")) {
+            "read" -> GELESEN
+            "delivered" -> ZUGESTELLT
+            else -> return null
+        }
+        return Eingang(teile[1], normiereId(teile[2]), msgId, stufe)
+    }
+
+    /** Haken-Stufe einer eigenen, gespeicherten Nachricht: 1 = gespeichert, 2 = zugestellt, 3 = gelesen */
+    fun haken(zugestellt: Int, gelesen: Int, von: Int): Int = when {
+        von <= 0 -> HAKEN_GESPEICHERT
+        gelesen >= von -> HAKEN_GELESEN
+        zugestellt >= von -> HAKEN_ZUGESTELLT
+        else -> HAKEN_GESPEICHERT
+    }
+
+    // Message.status-Werte der gespiegelten eigenen Rosenweg-Nachrichten (SMS nutzt sie nie)
+    const val HAKEN_GESPEICHERT = 1001
+    const val HAKEN_ZUGESTELLT = 1002
+    const val HAKEN_GELESEN = 1003
 }

@@ -310,6 +310,7 @@ class ThreadActivity : SimpleActivity() {
             }
 
             markThreadMessagesRead(threadId)
+            RosenwegHooks.angezeigt(this, threadId)
         }
 
         val bottomBarColor = getBottomBarColor()
@@ -613,6 +614,9 @@ class ThreadActivity : SimpleActivity() {
 
     private fun setupAdapter() {
         val latestThreadItems = getThreadItems()
+        if (isRosenweg && isActivityVisible) {
+            RosenwegHooks.angezeigt(this, threadId)
+        }
 
         runOnUiThread {
             threadItems = latestThreadItems
@@ -1418,7 +1422,8 @@ class ThreadActivity : SimpleActivity() {
                 conversationsDB.markRead(threadId)
             }
 
-            if (i == cnt - 1 && (message.type == Telephony.Sms.MESSAGE_TYPE_SENT)) {
+            // Rosenweg zeigt die Haken in der Sprechblase (ThreadAdapter)
+            if (i == cnt - 1 && (message.type == Telephony.Sms.MESSAGE_TYPE_SENT) && message.id >= 0) {
                 items.add(
                     ThreadSent(
                         messageId = message.id,

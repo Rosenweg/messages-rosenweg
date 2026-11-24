@@ -29,7 +29,7 @@ class RosenwegApi(private val konto: RosenwegKonto) {
         return parseVerlauf(anfrage("GET", "/api/history/${enc(chatId)}$q"))
     }
 
-    fun verzeichnis(): Map<String, String> = parseVerzeichnis(anfrage("GET", "/api/directory"))
+    fun verzeichnis(): Map<String, RwPerson> = parseVerzeichnis(anfrage("GET", "/api/directory"))
 
     fun mitglieder(chatId: String): List<String> = parseMitglieder(anfrage("GET", "/api/conversations/${enc(chatId)}/members"))
 

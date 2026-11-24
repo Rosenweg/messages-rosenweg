@@ -25,8 +25,13 @@ class RosenwegSpeicher private constructor(context: Context) {
     private val dao = RosenwegDatenbank.get(app).dao()
     private val sperre = Any()
 
+    private val avatare = RosenwegAvatare(app)
+
     @Volatile
-    private var namen: Map<String, String>? = null
+    private var personen: Map<String, RwUser>? = null
+
+    /** Quittungen fuer den Erstimport nur fuer juengere Nachrichten senden (keine Flut) */
+    private val QUITTUNG_ERSTIMPORT_MS = 7L * 24 * 60 * 60 * 1000
 
     companion object {
         const val NAME_SYSTEM = "Rosenweg"
@@ -47,14 +52,32 @@ class RosenwegSpeicher private constructor(context: Context) {
 
     // ── Namen ───────────────────────────────────────────────────────────
 
-    private fun namen(): Map<String, String> =
-        namen ?: dao.benutzer().associate { it.id to it.name }.also { namen = it }
+    private fun personen(): Map<String, RwUser> =
+        personen ?: dao.benutzer().associateBy { it.id }.also { personen = it }
 
-    fun speichereVerzeichnis(eintraege: Map<String, String>): Unit = synchronized(sperre) {
-        if (eintraege.isEmpty()) return
-        dao.speichereBenutzer(eintraege.map { RwUser(it.key, it.value) })
-        namen = null
+    private fun namen(): Map<String, String> = personen().mapValues { it.value.name }
+
+    /**
+     * Uebernimmt /api/directory (+ eigenes Bild aus dem Anlage-Token). Hat sich ein
+     * Name oder Bild geaendert, werden alle Spiegel neu geschrieben. Rueckgabe: geaendert.
+     */
+    fun speichereVerzeichnis(eintraege: Map<String, RwPerson>, eigenesBild: String? = null): Boolean = synchronized(sperre) {
+        val neu = eintraege.map { RwUser(it.key, it.value.name, it.value.avatar) }.toMutableList()
+        val ich = eigeneId
+        if (ich != null && (eigenesBild != null || personen()[ich] != null)) {
+            neu.add(RwUser(ich, RosenwegKonto.bekannt()?.name ?: name(ich), eigenesBild ?: personen()[ich]?.avatar))
+        }
+        if (neu.isEmpty()) return false
+        val alt = personen()
+        val geaendert = neu.any { alt[it.id] != it }
+        if (!geaendert) return false
+        dao.speichereBenutzer(neu)
+        personen = null
+        spiegleAllesIntern()
+        true
     }
+
+    private fun personenBild(userId: String): String = avatare.bild(personen()[userId]?.avatar)
 
     /** Nie rohe IDs anzeigen: Verzeichnis, eigener Name, "Rosenweg" fuer System, sonst "Unbekannt". */
     fun name(userId: String): String = when {
@@ -83,7 +106,7 @@ class RosenwegSpeicher private constructor(context: Context) {
             rawId = adresse.hashCode(),
             contactId = adresse.hashCode(),
             name = name(userId),
-            photoUri = "",
+            photoUri = personenBild(userId),
             phoneNumbers = arrayListOf(PhoneNumber(adresse, 0, "", adresse)),
             birthdays = ArrayList(),
             anniversaries = ArrayList()
@@ -148,6 +171,7 @@ class RosenwegSpeicher private constructor(context: Context) {
                 lastServerId = alt?.lastServerId ?: 0,
                 canWrite = kannSchreiben,
                 threadId = alt?.threadId ?: 0,
+                avatar = g.avatar,
             )
             if (alt == null) {
                 val seq = dao.neuerChat(chat)
@@ -196,6 +220,9 @@ class RosenwegSpeicher private constructor(context: Context) {
                 editedAt = if (ausVerlauf) d.editedAt ?: alt.editedAt else alt.editedAt,
                 deleted = alt.deleted || d.deleted,
                 reactions = if (ausVerlauf) reaktionenZuJson(d.reactions) else alt.reactions,
+                rcptNZugestellt = d.quittung?.zugestellt ?: alt.rcptNZugestellt,
+                rcptNGelesen = d.quittung?.gelesen ?: alt.rcptNGelesen,
+                rcptVon = d.quittung?.von ?: alt.rcptVon,
             )
             if (nachricht != alt) dao.aendereNachricht(nachricht)
         } else {
@@ -215,6 +242,16 @@ class RosenwegSpeicher private constructor(context: Context) {
                 mediaName = d.mediaName,
                 status = if (eigen) RwStatus.GESENDET else RwStatus.EMPFANGEN,
                 read = eigen || gelesen,
+                // fremde Nachricht: einmal "zugestellt" melden (Erstimport nur die letzten 7 Tage)
+                rcptSoll = when {
+                    eigen || d.clientMsgId == null -> 0
+                    gelesen && d.ts < System.currentTimeMillis() - QUITTUNG_ERSTIMPORT_MS -> 2
+                    else -> RwQuittung.ZUGESTELLT
+                },
+                rcptGesendet = if (!eigen && gelesen && d.ts < System.currentTimeMillis() - QUITTUNG_ERSTIMPORT_MS) 2 else 0,
+                rcptNZugestellt = d.quittung?.zugestellt ?: 0,
+                rcptNGelesen = d.quittung?.gelesen ?: 0,
+                rcptVon = d.quittung?.von,
             )
             val zeile = dao.neueNachricht(roh)
             nachricht = roh.copy(rowId = zeile, mirroredMessageId = RosenwegIds.nachrichtId(zeile))
@@ -332,12 +369,13 @@ class RosenwegSpeicher private constructor(context: Context) {
             else -> Telephony.Sms.MESSAGE_TYPE_SENT
         }
         val absender = kontakt(m.senderId)
+        val status = if (eigen && m.status == RwStatus.GESENDET) haken(chat, m) else Telephony.Sms.STATUS_NONE
         app.messagesDB.insertOrUpdate(
             Message(
                 id = m.mirroredMessageId,
                 body = anzeige(m),
                 type = typ,
-                status = Telephony.Sms.STATUS_NONE,
+                status = status,
                 participants = arrayListOf(absender),
                 date = (m.ts / 1000).toInt(),
                 read = m.read,
@@ -346,7 +384,7 @@ class RosenwegSpeicher private constructor(context: Context) {
                 attachment = null,
                 senderPhoneNumber = RW_ADRESSE + m.senderId,
                 senderName = absender.name,
-                senderPhotoUri = "",
+                senderPhotoUri = absender.photoUri,
                 subscriptionId = -1,
             )
         )
@@ -357,14 +395,15 @@ class RosenwegSpeicher private constructor(context: Context) {
         val letzte = nachrichten.lastOrNull()
         val alt = app.conversationsDB.getConversationWithThreadId(chat.threadId)
         val ungelesen = nachrichten.count { !it.read && it.status == RwStatus.EMPFANGEN }
-        val datum = letzte?.let { (it.ts / 1000).toInt() } ?: alt?.date ?: (System.currentTimeMillis() / 1000).toInt()
+        // ohne Nachrichten: Datum 0 (unten in der Liste), leerer Ausschnitt
+        val datum = letzte?.let { (it.ts / 1000).toInt() } ?: 0
         return Conversation(
             threadId = chat.threadId,
             snippet = letzte?.let { anzeige(it) } ?: "",
             date = datum,
             read = ungelesen == 0,
             title = if (alt?.usesCustomTitle == true) alt.title else titel(chat),
-            photoUri = "",
+            photoUri = gespraechsBild(chat),
             isGroupConversation = chat.kind != "dm",
             phoneNumber = RW_ADRESSE + chat.id,
             isScheduled = false,
@@ -374,13 +413,69 @@ class RosenwegSpeicher private constructor(context: Context) {
         )
     }
 
+    /** Bild wie in der PWA: DM = Person, sonst eigenes Logo / Standardlogo / 🚨📢 */
+    fun gespraechsBild(chat: RwChat): String =
+        if (chat.kind == "dm") {
+            mitglieder(chat).firstOrNull { it != eigeneId }?.let { personenBild(it) } ?: ""
+        } else {
+            avatare.gespraech(chat.id, chat.kind, chat.avatar)
+        }
+
+    fun personenBildFuer(userId: String): String = personenBild(userId)
+
+    // ── Quittungen / Haken ──────────────────────────────────────────────
+
+    private fun liste(text: String?): Set<String> =
+        (text?.let { parseJson(it) } as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }?.toSet() ?: emptySet()
+
+    private fun listeJson(ids: Set<String>) = JsonArray(ids.map { JsonPrimitive(it) }).toString()
+
+    private fun haken(chat: RwChat, m: RwMessage): Int {
+        val von = m.rcptVon ?: if (chat.kind == "dm") 1 else mitglieder(chat).count { it != eigeneId }
+        val gelesen = liste(m.rcptGelesen)
+        val zugestellt = liste(m.rcptZugestellt) + gelesen
+        return RwQuittung.haken(maxOf(m.rcptNZugestellt, zugestellt.size), maxOf(m.rcptNGelesen, gelesen.size), von)
+    }
+
+    /** Eingehende Quittung fuer eine eigene Nachricht. Rueckgabe: Haken geaendert. */
+    fun nimmQuittung(q: RwQuittung.Eingang): Boolean = synchronized(sperre) {
+        if (q.userId == eigeneId) return false
+        val chat = dao.chat(q.chatId) ?: return false
+        val m = dao.nachricht(chat.id, q.clientMsgId) ?: return false
+        if (m.senderId != eigeneId) return false
+        val zugestellt = liste(m.rcptZugestellt) + q.userId
+        val gelesen = if (q.stufe >= RwQuittung.GELESEN) liste(m.rcptGelesen) + q.userId else liste(m.rcptGelesen)
+        val neu = m.copy(rcptZugestellt = listeJson(zugestellt), rcptGelesen = listeJson(gelesen))
+        if (neu == m) return false
+        val vorher = haken(chat, m)
+        dao.aendereNachricht(neu)
+        val nachher = haken(chat, neu)
+        if (vorher != nachher) spiegleNachricht(chat, neu)
+        vorher != nachher
+    }
+
+    /** Thread wird angezeigt: fuer alle fremden Nachrichten "gelesen" vormerken. */
+    fun quittiereGelesen(threadId: Long): Boolean = synchronized(sperre) {
+        val chat = dao.chatZuThread(threadId) ?: return false
+        val ich = eigeneId ?: return false
+        dao.quittungGelesenSoll(chat.id, ich) > 0
+    }
+
+    fun offeneQuittungen(): List<RwMessage> = dao.offeneQuittungen()
+
+    fun quittungGesendet(rowId: Long, stufe: Int) = dao.quittungGesendet(rowId, stufe)
+
     private fun spiegleGespraech(chat: RwChat) {
         app.conversationsDB.insertOrUpdate(baueConversation(chat))
     }
 
     /** Alle Spiegel neu schreiben (z.B. nach dem einmaligen Leeren der Fossify-DB). */
     fun spiegleAlles(): Unit = synchronized(sperre) {
-        namen = null
+        personen = null
+        spiegleAllesIntern()
+    }
+
+    private fun spiegleAllesIntern() {
         for (chat in dao.chats()) {
             dao.nachrichten(chat.id).forEach { spiegleNachricht(chat, it) }
             spiegleGespraech(chat)

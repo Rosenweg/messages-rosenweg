@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
+import android.provider.Telephony
 import android.text.SpannableStringBuilder
 import android.text.Spanned
 import android.text.style.StyleSpan
@@ -50,6 +51,9 @@ import org.fossify.commons.helpers.SimpleContactsHelper
 import org.fossify.commons.helpers.ensureBackgroundThread
 import org.fossify.commons.views.MyRecyclerView
 import org.fossify.messages.R
+import org.fossify.messages.rosenweg.RwQuittung
+import org.fossify.messages.rosenweg.RW_HAKEN_BLAU
+import org.fossify.commons.extensions.adjustAlpha
 import org.fossify.messages.activities.NewConversationActivity
 import org.fossify.messages.activities.SimpleActivity
 import org.fossify.messages.activities.ThreadActivity
@@ -501,6 +505,26 @@ class ThreadAdapter(
                     }
 
                     setCompoundDrawables(null, null, scheduledDrawable, null)
+                } else if (message.id < 0 && message.type == Telephony.Sms.MESSAGE_TYPE_SENT) {
+                    // Rosenweg: WhatsApp-Haken in der Sprechblase (1 grau gespeichert,
+                    // 2 grau zugestellt, 2 blau gelesen)
+                    typeface = FontHelper.getTypeface(activity)
+                    val haken = when (message.status) {
+                        RwQuittung.HAKEN_ZUGESTELLT, RwQuittung.HAKEN_GELESEN -> R.drawable.ic_check_double_vector
+                        else -> org.fossify.commons.R.drawable.ic_check_vector
+                    }
+                    val farbe = if (message.status == RwQuittung.HAKEN_GELESEN) {
+                        RW_HAKEN_BLAU
+                    } else {
+                        contrastColor.adjustAlpha(0.6f)
+                    }
+                    val drawable = AppCompatResources.getDrawable(activity, haken)?.mutate()?.apply {
+                        applyColorFilter(farbe)
+                        val size = (lineHeight * 0.8f).toInt()
+                        setBounds(0, 0, size, size)
+                    }
+                    compoundDrawablePadding = (lineHeight * 0.25f).toInt()
+                    setCompoundDrawables(null, null, drawable, null)
                 } else {
                     typeface = FontHelper.getTypeface(activity)
                     setCompoundDrawables(null, null, null, null)

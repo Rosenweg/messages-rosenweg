@@ -134,7 +134,12 @@ class RosenwegProtokollTest {
         assertEquals(listOf("1", "2"), g[0].participants)
         assertNull(g[0].title)
         assertFalse(g[0].metadata!!.contains("avatar"))
-        assertEquals(mapOf("3" to "Anna", "4" to "b@x.ch"), parseVerzeichnis("""{"users":[{"id":3,"name":"Anna"},{"id":"4","email":"b@x.ch"}]}"""))
+        assertEquals(
+            mapOf("3" to RwPerson("Anna", "data:image/png;base64,AA=="), "4" to RwPerson("b@x.ch", null)),
+            parseVerzeichnis("""{"users":[{"id":3,"name":"Anna","avatar":"data:image/png;base64,AA=="},{"id":"4","email":"b@x.ch","avatar":null}]}""")
+        )
+        val mitLogo = parseGespraeche("""{"conversations":[{"id":"technik","kind":"group","title":"Technik","topic_prefix":"group/technik","metadata":{"avatar":"data:image/png;base64,AA=="}}]}""")
+        assertEquals("data:image/png;base64,AA==", mitLogo[0].avatar)
         assertEquals(listOf("1", "9"), parseMitglieder("""{"members":[{"userId":"1","role":"admin"},{"userId":9}]}"""))
     }
 
@@ -143,5 +148,32 @@ class RosenwegProtokollTest {
         assertEquals(1732440000000L, parseZeit(kotlinx.serialization.json.JsonPrimitive(1732440000)))
         assertEquals(1732440000000L, parseZeit(kotlinx.serialization.json.JsonPrimitive("2024-11-24T10:20:00+01:00")))
         assertEquals(1732440000000L, parseZeit(kotlinx.serialization.json.JsonPrimitive("2024-11-24 09:20:00+00")))
+    }
+
+    @Test
+    fun quittungen() {
+        val q = RwQuittung.parse("receipt/g1/42", """{"msgId":"c_1_abcdef","state":"read","ts":1}""")
+        assertEquals(RwQuittung.Eingang("g1", "42", "c_1_abcdef", RwQuittung.GELESEN), q)
+        assertEquals(RwQuittung.ZUGESTELLT, RwQuittung.parse("receipt/g1/7", """{"msgId":"c","state":"delivered"}""")!!.stufe)
+        assertNull(RwQuittung.parse("receipt/g1/7", """{"msgId":"c","state":"typing"}"""))
+        assertEquals("receipt/g1/5", RwQuittung.topic("g1", "5"))
+        val n = parseJson(RwQuittung.nutzlast("c_1", RwQuittung.GELESEN, 9)).toString()
+        assertEquals("""{"msgId":"c_1","state":"read","ts":9}""", n)
+
+        assertEquals(RwQuittung.HAKEN_GESPEICHERT, RwQuittung.haken(0, 0, 0))
+        assertEquals(RwQuittung.HAKEN_GESPEICHERT, RwQuittung.haken(5, 5, 0))
+        assertEquals(RwQuittung.HAKEN_GESPEICHERT, RwQuittung.haken(1, 0, 2))
+        assertEquals(RwQuittung.HAKEN_ZUGESTELLT, RwQuittung.haken(2, 1, 2))
+        assertEquals(RwQuittung.HAKEN_GELESEN, RwQuittung.haken(2, 2, 2))
+        assertEquals(RwQuittung.HAKEN_GELESEN, RwQuittung.haken(1, 1, 1))
+
+        val v = parseVerlauf("""{"messages":[{"id":1,"sender_id":"5","body":"x","client_msg_id":"c","created_at":1732440000000,
+            "receipt":{"delivered":3,"read":1,"of":4}}]}""")
+        assertEquals(RwQuittungZahlen(3, 1, 4), v[0].quittung)
+    }
+
+    @Test
+    fun jwtAvatar() {
+        assertEquals("https://x/y.png", leseJwt(jwt("""{"sub":"1","avatar_url":"https://x/y.png"}"""))!!.avatar)
     }
 }
