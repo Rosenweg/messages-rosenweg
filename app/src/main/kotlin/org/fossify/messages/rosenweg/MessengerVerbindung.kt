@@ -20,10 +20,13 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
+import org.fossify.commons.extensions.toast
 import org.fossify.commons.helpers.ensureBackgroundThread
 import org.fossify.messages.R
 import org.fossify.messages.activities.MainActivity
+import org.fossify.messages.extensions.config
 import org.fossify.messages.extensions.getNotificationBitmap
+import org.fossify.messages.extensions.messagesDB
 import org.fossify.messages.extensions.showReceivedMessageNotification
 import org.fossify.messages.helpers.refreshConversations
 import org.fossify.messages.helpers.refreshMessages
@@ -130,6 +133,8 @@ class MessengerVerbindung : Service() {
     private var geplant: ScheduledFuture<*>? = null
     private var erneuerung: ScheduledFuture<*>? = null
     private var konto: RosenwegKonto? = null
+    private var schluessel: RwGeraeteSchluessel? = null
+    private val schluesselCache = HashMap<String, Pair<Long, List<RwGeraet>>>()
     private var pubTopics: List<String>? = null
     private var verzeichnisGeholt = 0L
     private var chatsNachPrefix: Map<String, RwChat> = emptyMap()
@@ -251,10 +256,25 @@ class MessengerVerbindung : Service() {
             return
         }
         konto = k
+        // Geteiltes Telefon: anderer Benutzer als zuletzt → nichts vom Vorgaenger zeigen
+        val vorher = RosenwegKonto.eigeneIdGespeichert(this)
+        if (vorher != null && vorher != k.userId) {
+            Log.i(TAG, "anderer Benutzer angemeldet - lokaler Messenger-Verlauf geloescht")
+            speicher.allesLoeschen()
+            RwGeraeteSchluessel.vergiss()
+            refreshConversations()
+        }
         RosenwegKonto.merkeEigeneId(this, k.userId, k.name)
         try {
             val api = RosenwegApi(k)
-            val deviceId = RosenwegKonto.geraeteId(this)
+            val s = RwGeraeteSchluessel.fuer(this, k.userId)
+            schluessel = s
+            val deviceId = s.geraeteId
+            try {
+                api.registriereGeraet(deviceId, "Rosenweg Messenger (${Build.MODEL})", s.oeffentlichRoh)
+            } catch (e: Exception) {
+                Log.w(TAG, "Geraet nicht registriert", e)
+            }
             val zugang = api.mqttToken(deviceId)
             pubTopics = zugang.angaben?.pubTopics?.takeIf { zugang.angaben.sub != null }
 
@@ -280,6 +300,12 @@ class MessengerVerbindung : Service() {
                         Log.w(TAG, "Mitglieder ${g.id}", e)
                     }
                 }
+            }
+            // Frische Installation / Daten geloescht: Fossifys einmalige Cache-Leerung jetzt
+            // erledigen, bevor der Spiegel geschrieben wird (sonst loescht MainActivity ihn)
+            if (!config.wasDbCleared) {
+                messagesDB.deleteAllExceptRosenweg()
+                config.wasDbCleared = true
             }
             val chats = speicher.gleicheGespraecheAb(gespraeche, pubTopics, mitglieder)
             if (!spiegelGeprueft) {
@@ -379,6 +405,7 @@ class MessengerVerbindung : Service() {
         erneuerung = arbeiter.schedule({ verbinde() }, minOf(bisToken, bisKonto), TimeUnit.SECONDS)
 
         holeVerlauf()
+        holeBackfill()
         sendeAusstehendeJetzt()
     }
 
@@ -394,7 +421,7 @@ class MessengerVerbindung : Service() {
                 while (seiten++ < 20) {
                     val liste = api.verlauf(chat.id, chat.lastServerId)
                     for (d in liste) {
-                        speicher.nimmAuf(chat, d, ausVerlauf = true, gelesen = erstimport)
+                        speicher.nimmAuf(chat, klartext(chat, d), ausVerlauf = true, gelesen = erstimport)
                         geaendert = true
                     }
                     chat = speicher.chat(chat.id) ?: break
@@ -408,6 +435,51 @@ class MessengerVerbindung : Service() {
             refreshMessages()
             refreshConversations()
         }
+    }
+
+    /** DM entschluesseln (Eintrag fuer dieses Geraet); sonst unveraendert ("🔒 Nicht entschlüsselbar"). */
+    private fun klartext(chat: RwChat, d: RwNachrichtDaten): RwNachrichtDaten {
+        if (chat.kind != "dm" || d.ciphertext == null || d.deleted) return d
+        val klar = try {
+            schluessel?.entschluessele(d.ciphertext)
+        } catch (e: Exception) {
+            Log.w(TAG, "DM nicht entschluesselbar", e)
+            null
+        } ?: return d
+        val medien = RwKrypto.medienAusKlartext(klar)
+        return d.copy(
+            body = medien?.first ?: klar,
+            plain = klar,
+            mediaJson = medien?.second ?: d.mediaJson,
+            mediaName = medien?.second?.let { medienNameAusJson(it) } ?: d.mediaName,
+        )
+    }
+
+    /** Verlauf, den andere Geraete fuer dieses neu verschluesselt haben, abholen und anwenden. */
+    private fun holeBackfill() {
+        val k = konto ?: return
+        val s = schluessel ?: return
+        try {
+            speicher.speichereBackfill(RosenwegApi(k).backfillHolen(s.geraeteId))
+        } catch (e: Exception) {
+            Log.w(TAG, "Verlauf fuer neues Geraet nicht abholbar", e)
+        }
+        val n = speicher.wendeBackfillAn { s.entschluessele(it) }
+        if (n > 0) {
+            Log.i(TAG, "$n Direktnachrichten aus dem Verlauf anderer Geraete lesbar")
+            refreshMessages()
+            refreshConversations()
+        }
+    }
+
+    /** Geraeteschluessel eines Benutzers (5 min zwischengespeichert). */
+    private fun geraeteVon(userId: String): List<RwGeraet> {
+        val jetzt = System.currentTimeMillis()
+        schluesselCache[userId]?.takeIf { jetzt - it.first < 5 * 60_000 }?.let { return it.second }
+        val k = konto ?: return emptyList()
+        val liste = RosenwegApi(k).schluessel(userId)
+        schluesselCache[userId] = jetzt to liste
+        return liste
     }
 
     private fun trenne(sauber: Boolean) {
@@ -536,7 +608,7 @@ class MessengerVerbindung : Service() {
                     val (prefix, _) = RosenwegTopics.nachrichtTopic(topic) ?: return
                     val chat = chatsNachPrefix[prefix] ?: return
                     val d = parseLiveNachricht(topic, text) ?: return
-                    val e = speicher.nimmAuf(speicher.chat(chat.id) ?: chat, d, ausVerlauf = false, gelesen = false)
+                    val e = speicher.nimmAuf(speicher.chat(chat.id) ?: chat, klartext(chat, d), ausVerlauf = false, gelesen = false)
                     refreshMessages()
                     refreshConversations()
                     if (e.neu && e.nachricht.senderId != speicher.eigeneId) {
@@ -607,11 +679,39 @@ class MessengerVerbindung : Service() {
         sendeQuittungen()
         for (m in speicher.ausstehende()) {
             val chat = chatsNachId[m.chatId]
-            if (chat == null || chat.kind == "dm" || !chat.canWrite || m.body == null) {
+            if (chat == null || !chat.canWrite || m.body == null) {
                 speicher.setzeStatus(m.rowId, RwStatus.FEHLER)
                 continue
             }
-            val nutzlast = baueAusgehend(ich, m.clientMsgId ?: continue, m.ts, m.body)
+            val nutzlast = if (chat.kind == "dm") {
+                // E2E: fuer alle Geraete des Gegenuebers und alle eigenen (auch dieses)
+                val partner = speicher.dmPartner(chat)
+                val ziele = try {
+                    val fremde = partner?.let { geraeteVon(it) } ?: emptyList()
+                    if (fremde.isEmpty()) {
+                        Log.w(TAG, "DM: Gegenueber hat noch kein Geraet registriert")
+                        speicher.setzeStatus(m.rowId, RwStatus.FEHLER)
+                        toast("Gegenüber hat den Messenger noch nicht geöffnet – Nachricht nicht gesendet")
+                        refreshMessages()
+                        continue
+                    }
+                    (fremde + geraeteVon(ich)).associate { it.deviceId to it.pubkey } +
+                        (schluessel?.let { mapOf(it.geraeteId to it.oeffentlichRoh) } ?: emptyMap())
+                } catch (e: Exception) {
+                    // Netz/Server: ausstehend lassen, naechster Versuch bei der naechsten Verbindung
+                    Log.w(TAG, "DM: Schluessel nicht abrufbar", e)
+                    continue
+                }
+                try {
+                    baueAusgehendDm(ich, m.clientMsgId ?: continue, m.ts, RwKrypto.verschluessele(m.plain ?: m.body, ziele))
+                } catch (e: Exception) {
+                    Log.w(TAG, "DM: Verschluesselung fehlgeschlagen", e)
+                    speicher.setzeStatus(m.rowId, RwStatus.FEHLER)
+                    continue
+                }
+            } else {
+                baueAusgehend(ich, m.clientMsgId ?: continue, m.ts, m.body)
+            }
             // QoS 1: PUBACK → gesendet; ohne PUBACK bleibt sie ausstehend und geht bei der
             // naechsten Verbindung erneut raus (Server entdoppelt am clientMsgId)
             c.publish(RosenwegTopics.sendeTopic(chat.topicPrefix, ich), nutzlast.toByteArray(Charsets.UTF_8), 1, false) { ok ->

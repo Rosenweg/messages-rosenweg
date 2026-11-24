@@ -33,6 +33,29 @@ class RosenwegApi(private val konto: RosenwegKonto) {
 
     fun mitglieder(chatId: String): List<String> = parseMitglieder(anfrage("GET", "/api/conversations/${enc(chatId)}/members"))
 
+    /** Geraet + oeffentlichen Schluessel registrieren (idempotent, setzt last_seen). */
+    fun registriereGeraet(deviceId: String, label: String, pubkey: String) {
+        anfrage("POST", "/api/devices", buildJsonObject {
+            put("deviceId", deviceId)
+            put("label", label)
+            put("pubkey", pubkey)
+            put("alg", RwKrypto.ALG)
+        }.toString())
+    }
+
+    fun schluessel(userId: String): List<RwGeraet> = parseSchluessel(anfrage("GET", "/api/keys/${enc(userId)}"))
+
+    fun eigeneGeraete(): List<RwGeraet> = parseEigeneGeraete(anfrage("GET", "/api/link/devices"))
+
+    /** Liest UND loescht (serverseitig) den fuer dieses Geraet hinterlegten Verlauf. */
+    fun backfillHolen(deviceId: String): List<RwBackfillEintrag> =
+        parseBackfill(anfrage("GET", "/api/link/backfill?deviceId=${enc(deviceId)}"))
+
+    /** entriesJson = JSON-Liste [{convId, origMsgId, senderId, createdAt, ciphertext}] */
+    fun backfillSenden(zielGeraet: String, entriesJson: String) {
+        anfrage("POST", "/api/link/backfill", """{"targetDeviceId":${kotlinx.serialization.json.JsonPrimitive(zielGeraet)},"entries":$entriesJson}""")
+    }
+
     private fun enc(s: String) = URLEncoder.encode(s, "UTF-8").replace("+", "%20")
 
     private fun anfrage(methode: String, pfad: String, body: String? = null): String {

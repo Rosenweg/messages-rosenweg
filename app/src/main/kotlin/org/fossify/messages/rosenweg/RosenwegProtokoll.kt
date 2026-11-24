@@ -192,6 +192,10 @@ data class RwNachrichtDaten(
     val deleted: Boolean = false,
     val replyPreview: String? = null,
     val mediaName: String? = null,
+    /** Medien-Beschreibung als JSON (Gruppe: payload.media; DM: aus RWMEDIA1 im Klartext) */
+    val mediaJson: String? = null,
+    /** DM: entschluesselter Klartext genau wie gesendet (inkl. RWMEDIA1-Marke) */
+    val plain: String? = null,
     val priority: String? = null,
     val clear: Boolean = false,
     /** emoji → Benutzer-IDs */
@@ -213,7 +217,8 @@ fun parseLiveNachricht(topic: String, payload: String, jetztMs: Long = System.cu
         ciphertext = (o["ciphertext"] ?: o["bundle"])?.takeIf { it !is JsonNull }?.toString(),
         ts = parseZeit(o["ts"]) ?: jetztMs,
         replyPreview = o.obj("replyTo")?.str("preview"),
-        mediaName = o.obj("media")?.let { it.str("filename") ?: it.str("mtype") ?: "Datei" },
+        mediaName = o.obj("media")?.let { medienName(it) },
+        mediaJson = o.obj("media")?.toString(),
         priority = o.str("priority"),
         clear = o.bool("clear") == true,
     )
@@ -251,7 +256,8 @@ fun parseVerlauf(text: String): List<RwNachrichtDaten> {
             editedAt = parseZeit(m["edited_at"]),
             deleted = m.bool("deleted") == true || (m["deleted_at"]?.let { it !is JsonNull } ?: false),
             replyPreview = replyObj?.str("preview"),
-            mediaName = media?.let { it.str("filename") ?: it.str("mtype") ?: "Datei" },
+            mediaName = media?.let { medienName(it) },
+            mediaJson = media?.toString(),
             reactions = reactions,
             quittung = m.obj("receipt")?.let { q ->
                 RwQuittungZahlen(
@@ -265,6 +271,19 @@ fun parseVerlauf(text: String): List<RwNachrichtDaten> {
 }
 
 /** Nutzlast einer ausgehenden Text-Nachricht (Gruppe/Ankuendigung). */
+fun medienName(m: JsonObject): String = m.str("filename") ?: if (m.str("mtype") == "image") "Bild" else "Datei"
+
+fun medienNameAusJson(json: String?): String? = (json?.let { parseJson(it) } as? JsonObject)?.let { medienName(it) }
+
+/** Nutzlast einer ausgehenden DM: nur das E2E-Buendel (nie Klartext). */
+fun baueAusgehendDm(senderId: String, clientMsgId: String, ts: Long, buendel: String): String =
+    buildJsonObject {
+        put("senderId", senderId)
+        put("clientMsgId", clientMsgId)
+        put("ts", ts)
+        put("ciphertext", parseJson(buendel) ?: throw IllegalArgumentException("Buendel kein JSON"))
+    }.toString()
+
 fun baueAusgehend(senderId: String, clientMsgId: String, ts: Long, body: String): String =
     buildJsonObject {
         put("senderId", senderId)
@@ -391,7 +410,7 @@ fun wendeReaktionAn(r: Map<String, List<String>>, userId: String, emoji: String,
 
 // ── Anzeige-Text der gespiegelten Fossify-Nachricht ─────────────────────
 
-const val RW_TEXT_VERSCHLUESSELT = "🔒 Verschlüsselte Nachricht"
+const val RW_TEXT_VERSCHLUESSELT = "🔒 Nicht entschlüsselbar"
 const val RW_TEXT_GELOESCHT = "🚫 Nachricht gelöscht"
 
 fun anzeigeText(
@@ -469,4 +488,42 @@ object RwQuittung {
     const val HAKEN_GESPEICHERT = 1001
     const val HAKEN_ZUGESTELLT = 1002
     const val HAKEN_GELESEN = 1003
+}
+
+// ── Geraete / Schluessel / Verlauf fuer neue Geraete ────────────────────
+
+data class RwGeraet(val deviceId: String, val pubkey: String, val lastSeen: Long?)
+
+/** GET /api/keys/:uid → Geraete mit ecdh-p256-Schluessel (ohne widerrufene) */
+fun parseSchluessel(text: String): List<RwGeraet> {
+    val o = parseJson(text) as? JsonObject ?: return emptyList()
+    return o.arr("keys")?.mapNotNull { e ->
+        val k = e as? JsonObject ?: return@mapNotNull null
+        if (k["revoked_at"]?.let { it !is kotlinx.serialization.json.JsonNull } == true) return@mapNotNull null
+        val alg = k.str("alg")
+        if (alg != null && alg != RwKrypto.ALG) return@mapNotNull null
+        RwGeraet(k.str("device_id") ?: return@mapNotNull null, k.str("pubkey") ?: return@mapNotNull null, parseZeit(k["last_seen"]))
+    } ?: emptyList()
+}
+
+/** GET /api/link/devices → eigene Geraete */
+fun parseEigeneGeraete(text: String): List<RwGeraet> {
+    val o = parseJson(text) as? JsonObject ?: return emptyList()
+    return o.arr("devices")?.mapNotNull { e ->
+        val d = e as? JsonObject ?: return@mapNotNull null
+        RwGeraet(d.str("deviceId") ?: return@mapNotNull null, d.str("pubkey") ?: return@mapNotNull null, parseZeit(d["lastSeen"]))
+    } ?: emptyList()
+}
+
+data class RwBackfillEintrag(val convId: String, val origMsgId: Long, val ciphertext: String)
+
+/** GET /api/link/backfill → Eintraege (Buendel als JSON-Text) */
+fun parseBackfill(text: String): List<RwBackfillEintrag> {
+    val o = parseJson(text) as? JsonObject ?: return emptyList()
+    return o.arr("entries")?.mapNotNull { e ->
+        val b = e as? JsonObject ?: return@mapNotNull null
+        val ct = b["ciphertext"] ?: return@mapNotNull null
+        val buendel = if (ct is JsonPrimitive) ct.contentOrNull ?: return@mapNotNull null else ct.toString()
+        RwBackfillEintrag(b.str("convId") ?: return@mapNotNull null, b.lng("origMsgId") ?: return@mapNotNull null, buendel)
+    } ?: emptyList()
 }

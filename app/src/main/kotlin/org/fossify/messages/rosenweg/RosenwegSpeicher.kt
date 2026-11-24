@@ -97,6 +97,75 @@ class RosenwegSpeicher private constructor(context: Context) {
         return chat.title ?: chat.id
     }
 
+    /** Gegenueber einer DM (null fuer Gruppen) */
+    fun dmPartner(chat: RwChat): String? = if (chat.kind == "dm") mitglieder(chat).firstOrNull { it != eigeneId } else null
+
+    fun mitgliederIds(chat: RwChat): List<String> = mitglieder(chat)
+
+    // ── E2E: Verlauf von anderen Geraeten, nachtraegliches Entschluesseln ──
+
+    fun speichereBackfill(eintraege: List<RwBackfillEintrag>): Unit = synchronized(sperre) {
+        if (eintraege.isEmpty()) return
+        dao.speichereBackfill(eintraege.map { RwBackfill(it.convId, it.origMsgId, it.ciphertext) })
+    }
+
+    /**
+     * Hinterlegten Verlauf anwenden: passende (unlesbare) DM per Server-ID suchen und
+     * mit dem neu verschluesselten Buendel lesbar machen. Rueckgabe: Anzahl gelesen.
+     */
+    fun wendeBackfillAn(entschluessele: (String) -> String?): Int = synchronized(sperre) {
+        var n = 0
+        for (e in dao.backfill()) {
+            val chat = dao.chat(e.convId)
+            val m = chat?.let { dao.nachrichtZuServerId(it.id, e.origMsgId) } ?: continue
+            if (m.body == null && !m.deleted) {
+                val klar = entschluessele(e.ciphertext)
+                if (klar != null) {
+                    val neu = mitKlartext(m, klar)
+                    dao.aendereNachricht(neu)
+                    spiegleNachricht(chat, neu)
+                    n++
+                }
+            }
+            dao.loescheBackfill(e.convId, e.origMsgId)
+        }
+        if (n > 0) dao.chats().forEach { spiegleGespraech(it) }
+        n
+    }
+
+    private fun mitKlartext(m: RwMessage, klar: String): RwMessage {
+        val medien = RwKrypto.medienAusKlartext(klar)
+        return m.copy(
+            body = medien?.first ?: klar,
+            plain = klar,
+            media = medien?.second ?: m.media,
+            mediaName = medien?.second?.let { medienNameAusJson(it) } ?: m.mediaName,
+        )
+    }
+
+    /** Lesbare DMs eines Chats (Server-ID, Absender, Zeit, Klartext) fuer die Weitergabe an neue Geraete */
+    fun lesbareDms(chatId: String): List<RwMessage> =
+        dao.nachrichten(chatId).filter { it.serverId != null && it.plain != null && !it.deleted }
+
+    /** Anderer Benutzer auf dem geteilten Telefon: alles Rosenweg-Lokale loeschen. */
+    fun allesLoeschen(): Unit = synchronized(sperre) {
+        dao.chats().forEach {
+            app.messagesDB.deleteRosenwegMirrorThread(it.threadId)
+            app.conversationsDB.deleteThreadId(it.threadId)
+        }
+        try {
+            app.conversationsDB.getRosenwegThreadIds().forEach { app.conversationsDB.deleteThreadId(it) }
+            app.messagesDB.getRosenwegMirrorThreadIds().forEach { app.messagesDB.deleteRosenwegMirrorThread(it) }
+        } catch (e: Exception) {
+            Log.w(TAG, "Spiegel loeschen", e)
+        }
+        dao.loescheAlleNachrichten()
+        dao.loescheAlleChats()
+        dao.loescheAlleBenutzer()
+        dao.loescheAllesBackfill()
+        personen = null
+    }
+
     private fun mitglieder(chat: RwChat): List<String> {
         val text = chat.members ?: return emptyList()
         return (parseJson(text) as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull } ?: emptyList()
@@ -216,8 +285,16 @@ class RosenwegSpeicher private constructor(context: Context) {
             nachricht = alt.copy(
                 serverId = d.serverId ?: alt.serverId,
                 status = if (alt.status == RwStatus.AUSSTEHEND || alt.status == RwStatus.FEHLER) RwStatus.GESENDET else alt.status,
-                // Der Verlauf ist die Wahrheit fuer Bearbeiten/Loeschen/Reaktionen
-                body = if (ausVerlauf && !d.deleted) d.body ?: alt.body else alt.body,
+                // Der Verlauf ist die Wahrheit fuer Bearbeiten/Loeschen/Reaktionen;
+                // eine bisher unlesbare DM wird lesbar, sobald ein Klartext kommt
+                body = when {
+                    d.deleted -> alt.body
+                    ausVerlauf -> d.body ?: alt.body
+                    else -> alt.body ?: d.body
+                },
+                plain = alt.plain ?: d.plain,
+                media = alt.media ?: d.mediaJson,
+                mediaName = alt.mediaName ?: d.mediaName,
                 ciphertext = if (ausVerlauf) d.ciphertext ?: alt.ciphertext else alt.ciphertext,
                 editedAt = if (ausVerlauf) d.editedAt ?: alt.editedAt else alt.editedAt,
                 deleted = alt.deleted || d.deleted,
@@ -254,6 +331,8 @@ class RosenwegSpeicher private constructor(context: Context) {
                 rcptNZugestellt = d.quittung?.zugestellt ?: 0,
                 rcptNGelesen = d.quittung?.gelesen ?: 0,
                 rcptVon = d.quittung?.von,
+                plain = d.plain,
+                media = d.mediaJson,
             )
             val zeile = dao.neueNachricht(roh)
             nachricht = roh.copy(rowId = zeile, mirroredMessageId = RosenwegIds.nachrichtId(zeile))
@@ -307,6 +386,7 @@ class RosenwegSpeicher private constructor(context: Context) {
             mediaName = null,
             status = RwStatus.AUSSTEHEND,
             read = true,
+            plain = if (chat.kind == "dm") text else null,
         )
         val zeile = dao.neueNachricht(roh)
         val m = roh.copy(rowId = zeile, mirroredMessageId = RosenwegIds.nachrichtId(zeile))

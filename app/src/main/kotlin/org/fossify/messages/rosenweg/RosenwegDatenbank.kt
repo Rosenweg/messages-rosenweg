@@ -85,6 +85,18 @@ data class RwMessage(
     @ColumnInfo(name = "rcpt_n_zugestellt", defaultValue = "0") val rcptNZugestellt: Int = 0,
     @ColumnInfo(name = "rcpt_n_gelesen", defaultValue = "0") val rcptNGelesen: Int = 0,
     @ColumnInfo(name = "rcpt_von") val rcptVon: Int? = null,
+    /** DM: entschluesselter Klartext (inkl. RWMEDIA1), fuer Weitergabe an neue Geraete */
+    @ColumnInfo(name = "plain") val plain: String? = null,
+    /** Medien-Beschreibung (JSON) fuer die Medien-Anzeige */
+    @ColumnInfo(name = "media") val media: String? = null,
+)
+
+/** Verlauf, den ein anderes Geraet fuer dieses neu verschluesselt hat (bis die Nachricht da ist) */
+@Entity(tableName = "backfill", primaryKeys = ["conv_id", "orig_msg_id"])
+data class RwBackfill(
+    @ColumnInfo(name = "conv_id") val convId: String,
+    @ColumnInfo(name = "orig_msg_id") val origMsgId: Long,
+    @ColumnInfo(name = "ciphertext") val ciphertext: String,
 )
 
 @Entity(tableName = "user")
@@ -160,6 +172,30 @@ interface RosenwegDao {
     @Query("UPDATE rwmessage SET read = 1 WHERE chat_id = :chatId")
     fun markiereGelesen(chatId: String)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    fun speichereBackfill(e: List<RwBackfill>)
+
+    @Query("SELECT * FROM backfill")
+    fun backfill(): List<RwBackfill>
+
+    @Query("DELETE FROM backfill WHERE conv_id = :convId AND orig_msg_id = :origMsgId")
+    fun loescheBackfill(convId: String, origMsgId: Long)
+
+    @Query("SELECT * FROM rwmessage WHERE chat_id = :chatId AND ciphertext IS NOT NULL AND body IS NULL AND deleted = 0")
+    fun unlesbare(chatId: String): List<RwMessage>
+
+    @Query("DELETE FROM rwmessage")
+    fun loescheAlleNachrichten()
+
+    @Query("DELETE FROM chat")
+    fun loescheAlleChats()
+
+    @Query("DELETE FROM user")
+    fun loescheAlleBenutzer()
+
+    @Query("DELETE FROM backfill")
+    fun loescheAllesBackfill()
+
     @Query("SELECT * FROM user")
     fun benutzer(): List<RwUser>
 
@@ -167,7 +203,7 @@ interface RosenwegDao {
     fun speichereBenutzer(users: List<RwUser>)
 }
 
-@Database(entities = [RwChat::class, RwMessage::class, RwUser::class], version = 2, exportSchema = true)
+@Database(entities = [RwChat::class, RwMessage::class, RwUser::class, RwBackfill::class], version = 3, exportSchema = true)
 abstract class RosenwegDatenbank : RoomDatabase() {
     abstract fun dao(): RosenwegDao
 
@@ -190,6 +226,16 @@ abstract class RosenwegDatenbank : RoomDatabase() {
                     db.execSQL("ALTER TABLE rwmessage ADD COLUMN rcpt_von INTEGER")
                     // Bestehender Verlauf: keine nachtraegliche Quittungs-Flut
                     db.execSQL("UPDATE rwmessage SET rcpt_soll = 2, rcpt_gesendet = 2")
+                }
+            },
+            object : Migration(2, 3) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE rwmessage ADD COLUMN plain TEXT")
+                    db.execSQL("ALTER TABLE rwmessage ADD COLUMN media TEXT")
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS `backfill` (`conv_id` TEXT NOT NULL, `orig_msg_id` INTEGER NOT NULL, " +
+                            "`ciphertext` TEXT NOT NULL, PRIMARY KEY(`conv_id`, `orig_msg_id`))"
+                    )
                 }
             },
         )

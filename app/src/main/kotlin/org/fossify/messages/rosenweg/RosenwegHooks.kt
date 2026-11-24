@@ -17,7 +17,6 @@ import org.fossify.messages.models.Message
  * anders behandeln muessen. Jede Funktion ist fuer SMS-Threads ohne Wirkung.
  */
 object RosenwegHooks {
-    const val TEXT_DM_FOLGT = "Verschlüsselte Direktnachrichten folgen"
     const val TEXT_NUR_LESEN = "In diesem Kanal kannst du nur lesen"
 
     /** Context.getMessages fuer Rosenweg-Threads: aus der Fossify-DB (Spiegel). */
@@ -39,7 +38,6 @@ object RosenwegHooks {
     fun schreibSperre(context: Context, threadId: Long): String? {
         val chat = RosenwegSpeicher.get(context).chatZuThread(threadId) ?: return null
         return when {
-            chat.kind == "dm" -> TEXT_DM_FOLGT
             !chat.canWrite -> TEXT_NUR_LESEN
             else -> null
         }
