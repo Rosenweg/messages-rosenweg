@@ -87,13 +87,14 @@ class RosenwegSpeicher private constructor(context: Context) {
     fun name(userId: String): String = when {
         userId == RW_SYSTEM_ABSENDER -> NAME_SYSTEM
         userId == eigeneId -> RosenwegKonto.bekannt()?.name ?: RosenwegKonto.eigenerNameGespeichert(app) ?: NAME_DU
-        else -> namen()[userId] ?: NAME_UNBEKANNT
+        // nicht im Verzeichnis: lieber die ID als gar nichts (Entscheid 24.11.2026)
+        else -> namen()[userId] ?: userId
     }
 
     fun titel(chat: RwChat): String {
         if (chat.kind == "dm") {
             val anderer = mitglieder(chat).firstOrNull { it != eigeneId }
-            if (anderer != null) return namen()[anderer] ?: chat.title ?: NAME_UNBEKANNT
+            if (anderer != null) return namen()[anderer] ?: chat.title ?: anderer
             return chat.title ?: "Direktnachricht"
         }
         return chat.title ?: chat.id

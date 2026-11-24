@@ -421,6 +421,7 @@ class MessengerVerbindung : Service() {
         val filter = ArrayList<String>()
         filter.add(RosenwegTopics.KRISE)
         filter.add("presence/#")
+        filter.add("inbox/${k.userId}")
         for (chat in chatsNachId.values) {
             filter.add(RosenwegTopics.empfangsFilter(chat.topicPrefix))
             filter.add(RosenwegTopics.control(chat.id))
@@ -529,6 +530,8 @@ class MessengerVerbindung : Service() {
             }
         }
     }
+
+    private var inboxGeplant: ScheduledFuture<*>? = null
 
     private var backfillGeschoben = 0L
 
@@ -708,6 +711,13 @@ class MessengerVerbindung : Service() {
                     val aktiv = (parseJson(text) as? kotlinx.serialization.json.JsonObject)?.bool("active") == true
                     Log.i(TAG, "sys/crisis: aktiv=$aktiv")
                     RosenwegNotfall.krise(this, aktiv)
+                }
+
+                topic.startsWith("inbox/") -> {
+                    // neues/entferntes Gespraech: (entprellt) Token + Gespraeche neu, neu verbinden
+                    Log.i(TAG, "inbox: $text")
+                    inboxGeplant?.cancel(false)
+                    inboxGeplant = arbeiter.schedule({ verbinde() }, 1500, TimeUnit.MILLISECONDS)
                 }
 
                 topic.startsWith("presence/") -> RosenwegLive.nimmPraesenz(topic, text)
