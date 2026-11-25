@@ -58,7 +58,8 @@ class MessengerVerbindung : Service() {
         private const val PING_ANTWORT_MS = 10_000L
         private const val CONNACK_WARTEN_S = 30L
         private const val AKTION_PING = "ch.rosenweg4303.messages.MQTT_PING"
-        private const val KANAL = "rosenweg_verbindung"
+        private const val KANAL = "rosenweg_verbindung_still"
+        private const val KANAL_ALT = "rosenweg_verbindung"
         private const val NOTIF_ID = 4303
         private const val AKTION_SENDEN = "ch.rosenweg4303.messages.SENDEN"
         private const val VERZEICHNIS_ALTER_MS = 60 * 60 * 1000L
@@ -245,9 +246,14 @@ class MessengerVerbindung : Service() {
 
     private fun starteVordergrund() {
         val nm = getSystemService(NotificationManager::class.java)
+        // MIN statt LOW: kein Symbol in der Statusleiste, ganz unten bei "Stumm" — die
+        // Dauerbenachrichtigung soll nicht nach einer neuen Nachricht aussehen.
+        // (Wichtigkeit eines Kanals laesst sich nachtraeglich nicht senken: neuer Kanal.)
+        if (nm.getNotificationChannel(KANAL_ALT) != null) nm.deleteNotificationChannel(KANAL_ALT)
         if (nm.getNotificationChannel(KANAL) == null) {
             nm.createNotificationChannel(
-                NotificationChannel(KANAL, "Rosenweg Messenger Verbindung", NotificationManager.IMPORTANCE_LOW).apply {
+                NotificationChannel(KANAL, "Verbindung (Dauerhinweis)", NotificationManager.IMPORTANCE_MIN).apply {
+                    description = "Haelt die Verbindung fuer neue Nachrichten und Notfaelle offen. Keine Nachricht."
                     setShowBadge(false)
                 }
             )
@@ -257,11 +263,15 @@ class MessengerVerbindung : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         val n: Notification = NotificationCompat.Builder(this, KANAL)
-            .setSmallIcon(R.drawable.ic_messenger)
-            .setContentTitle("Rosenweg Messenger verbunden")
+            .setSmallIcon(R.drawable.ic_verbindung)
+            .setContentTitle("Empfangsbereit")
+            .setContentText("Keine neuen Nachrichten – nur die Verbindung zum Rosenweg")
             .setOngoing(true)
             .setSilent(true)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setShowWhen(false)
+            .setNumber(0)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setPriority(NotificationCompat.PRIORITY_MIN)
             .setContentIntent(oeffnen)
             .build()
         // Android 14+: remoteMessaging (kein 6-h-Limit wie dataSync ab Android 15,
