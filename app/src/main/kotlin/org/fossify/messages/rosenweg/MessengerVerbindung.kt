@@ -430,7 +430,9 @@ class MessengerVerbindung : Service() {
         c.verbinde(
             RwMqttClient.Optionen(
                 clientId = "and_$deviceId",
-                username = zugang.token,
+                // Stefan 25.11.2026: Benutzername "msg-<sub>", JWT nur als Passwort - Mosquitto
+                // loggt Benutzernamen (fuer CrowdSec), Passwoerter nie.
+                username = "msg-" + (leseJwt(zugang.token)?.sub ?: k.userId),
                 password = zugang.token,
                 keepAliveSek = KEEPALIVE_S,
                 will = MqttCodec.Will(RosenwegTopics.presence(k.userId), bauePresence(false).toByteArray(), 1, true),
