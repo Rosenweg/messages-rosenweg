@@ -124,7 +124,12 @@ class MainActivity : SimpleActivity() {
         if (!MessengerVerbindung.istAktiv()) {
             MessengerVerbindung.starteWennKonto(this)
         }
-        // eigenes Handy: zurueck von der Anmeldung mit dem Rosenweg-Konto -> Zugang einrichten
+        // eigenes Handy, nur Messenger, nicht angemeldet: gemeinsamer Anmeldeschirm (commons-rosenweg)
+        if (nurMessenger && RosenwegPrivatAnmeldung.schirmNoetig(this)) {
+            RosenwegPrivatAnmeldung.starten(this)
+            return
+        }
+        // eigenes Handy: zurueck von der Anmeldung (Karte oder Rosenweg-Konto) -> Zugang einrichten
         richteEinWennAusstehend()
         zeigeAbgelehntHinweis()
         // z.B. zurueck aus "Standard-Apps": andere SMS-App gewaehlt -> ab jetzt nur Messenger
@@ -574,10 +579,10 @@ class MainActivity : SimpleActivity() {
             binding.noConversationsPlaceholder.text = when {
                 angemeldet -> "Noch keine Rosenweg-Chats"
                 einrichten -> "Rosenweg Messenger wird eingerichtet …"
-                else -> "Melde dich mit deinem Rosenweg-Konto an, dann siehst du hier deine Rosenweg-Chats."
+                else -> "Melde dich an (Rosenweg-Karte oder Rosenweg-Konto), dann siehst du hier deine Rosenweg-Chats."
             }
-            // nicht angemeldet: der Knopf unter dem Text meldet an (launchNewConversation)
-            binding.noConversationsPlaceholder2.text = if (angemeldet) "Neuen Rosenweg-Chat beginnen" else "Mit Rosenweg-Konto anmelden"
+            // nicht angemeldet: der Knopf unter dem Text oeffnet den Anmeldeschirm (launchNewConversation)
+            binding.noConversationsPlaceholder2.text = if (angemeldet) "Neuen Rosenweg-Chat beginnen" else "Anmelden"
             binding.noConversationsPlaceholder2.beVisibleIf(show && !einrichten)
             binding.conversationsFab.beVisibleIf(angemeldet)
             return
@@ -625,7 +630,7 @@ class MainActivity : SimpleActivity() {
                 "Der Rosenweg hat die Anmeldung des Messengers abgelehnt. Er empfängt und sendet darum " +
                     "nichts mehr. Melde dich neu an – deine Rosenweg-Chats bleiben erhalten."
             )
-            .setPositiveButton("Mit Rosenweg-Konto anmelden") { _, _ -> RosenwegPrivatAnmeldung.starten(this) }
+            .setPositiveButton("Neu anmelden") { _, _ -> RosenwegPrivatAnmeldung.starten(this) }
             .setNegativeButton("Später", null)
             .show()
     }

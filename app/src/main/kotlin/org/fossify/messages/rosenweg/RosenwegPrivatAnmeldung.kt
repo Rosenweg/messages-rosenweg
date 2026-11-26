@@ -26,10 +26,11 @@ import javax.crypto.spec.GCMParameterSpec
  * Rosenweg Messenger auf dem eigenen Handy (Stefan 26.11.2026): ohne Rosenweg Geraet meldet sich
  * die App selbst mit dem Rosenweg-Konto an - jede App fuer sich, kein gemeinsamer Kontospeicher.
  *
- * 1. [starten]: Anmeldung im Browser ueber [RosenwegAnmeldung] aus Rosenweg Cloud (Authentik
- *    "rosenweg-apps", PKCE, Ruecksprung ch.rosenweg4303.messages:/anmeldung).
- *    Spaeter kann hier der gemeinsame Anmeldeschirm (Commons, inkl. NFC-Karte) stehen: er muss
- *    nur ein Access-Token liefern und [mitKontoToken] aufrufen.
+ * 1. [starten]: der gemeinsame Anmeldeschirm aus commons-rosenweg (RosenwegAnmeldeSchirm, ab
+ *    Cloud 0.9.0) - wie der Sperrbildschirm der geteilten Telefone: Rosenweg-Karte hinten ans
+ *    Telefon halten (Karten-Sitzung) oder mit dem Rosenweg-Konto im Browser ([RosenwegAnmeldung],
+ *    Authentik "rosenweg-apps", PKCE, Ruecksprung ch.rosenweg4303.messages:/anmeldung). Beide
+ *    Wege liefern ueber RosenwegAnmeldung.zugangsToken ein Token fuer [mitKontoToken].
  * 2. [einrichtenWennAusstehend]/[mitKontoToken]: mit dem Access-Token EINMAL bei der Website einen
  *    festen Zugang fuer dieses Handy holen (POST /api/messenger/zugang -> {zugang, geheimnis}).
  *    Danach wird die Authentik-Anmeldung der App verworfen; gespeichert bleibt nur der Zugang,
@@ -103,10 +104,17 @@ object RosenwegPrivatAnmeldung {
     /** Laeuft gerade die Einrichtung nach der Anmeldung? (fuer die Anzeige) */
     fun richtetGeradeEin() = richtetEin
 
-    /** Schritt 1: Anmeldung mit dem Rosenweg-Konto starten (Browser). */
+    /** Schritt 1: gemeinsamer Anmeldeschirm (Karte oder Rosenweg-Konto). */
     fun starten(a: Activity) {
-        RosenwegAnmeldung.starten(a)
+        a.startActivity(android.content.Intent(a, ch.rosenweg4303.cloud.RosenwegAnmeldeSchirm::class.java))
     }
+
+    /**
+     * Beim Oeffnen der App (nur Messenger, eigenes Handy): ohne Anmeldung gleich den Schirm zeigen,
+     * wie die anderen Rosenweg-Apps. Nicht waehrend der Einrichtung und nicht nach einer Ablehnung
+     * (dafuer gibt es den eigenen Hinweis).
+     */
+    fun schirmNoetig(c: Context) = privat(c) && !hatZugang(c) && !ausstehend(c) && !richtetEin
 
     /** Zurueck aus dem Browser, aber noch kein Messenger-Zugang? */
     fun ausstehend(c: Context) = privat(c) && !angemeldet(c) && RosenwegAnmeldung.angemeldet(c)
