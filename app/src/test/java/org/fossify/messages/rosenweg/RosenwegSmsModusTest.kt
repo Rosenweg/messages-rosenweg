@@ -11,17 +11,14 @@ import javax.xml.parsers.DocumentBuilderFactory
 class RosenwegSmsModusTest {
     @Test
     fun modusAusGeraetUndRolle() {
-        assertEquals(RosenwegSmsModus.Modus.GETEILT, RosenwegSmsModus.modusAus(geraetDa = true, standardSmsApp = true))
-        assertEquals(RosenwegSmsModus.Modus.GETEILT, RosenwegSmsModus.modusAus(geraetDa = true, standardSmsApp = false))
-        assertEquals(RosenwegSmsModus.Modus.PRIVAT_UEBERGANG, RosenwegSmsModus.modusAus(geraetDa = false, standardSmsApp = true))
-        assertEquals(RosenwegSmsModus.Modus.PRIVAT, RosenwegSmsModus.modusAus(geraetDa = false, standardSmsApp = false))
+        assertEquals(RosenwegSmsModus.Modus.GETEILT, RosenwegSmsModus.modusAus(geraetDa = true))
+        // privat immer nur Messenger, auch wenn die App noch Standard-SMS-App ist (Stefan 26.11.2026)
+        assertEquals(RosenwegSmsModus.Modus.PRIVAT, RosenwegSmsModus.modusAus(geraetDa = false))
     }
 
     @Test
     fun smsBausteineNurPrivatAus() {
         assertTrue(RosenwegSmsModus.smsBausteineAn(RosenwegSmsModus.Modus.GETEILT))
-        // solange noch Standard-SMS-App: an lassen, sonst gingen eingehende SMS verloren
-        assertTrue(RosenwegSmsModus.smsBausteineAn(RosenwegSmsModus.Modus.PRIVAT_UEBERGANG))
         assertFalse(RosenwegSmsModus.smsBausteineAn(RosenwegSmsModus.Modus.PRIVAT))
     }
 
