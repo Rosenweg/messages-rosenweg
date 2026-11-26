@@ -14,6 +14,8 @@ Rosenweg-Messenger für die Smartphones der Siedlung Rosenweg in Kaiseraugst: Gr
 - **Notfall-Alarm:** Nachrichten im Notfall-Kanal (oder mit Priorität Notfall) erscheinen als rotes Vollbild mit Sirene, auch bei "Nicht stören", und werden wiederholt, bis sie gelesen sind.
 - Eine dauerhafte, stille Verbindung (Vordergrund-Dienst) hält den Empfang offen; sie startet bei der Anmeldung am geteilten Telefon. Beim Abmelden löscht die App ihre Daten.
 - **Rosenweg Updater:** Auf Handys ohne Rosenweg Gerät prüft die App den App-Katalog der Telefonanlage und bietet Aktualisierungen für alle installierten Rosenweg-Apps an. Jede APK wird vorher geprüft (Prüfsumme, Paketname, Version, Rosenweg-Signatur); Android lässt jede Installation bestätigen. Auf geteilten Telefonen übernimmt das Rosenweg Gerät.
+- **Zurückhalten bei Fehlern (eigenes Handy):** Nach einem Fehler wartet die App 30 s, dann immer länger bis 30 min (mit Zufall), bevor sie es wieder versucht. Lehnt der Server den Zugang ab (401/403), hört sie ganz auf und bittet, sich neu anzumelden; die Chats bleiben.
+- **Logo:** Rosenweg-Wappen (Turm, Weg, Rose auf Rot) mit dem Zeichen der App rechts unten, erzeugt mit dem Logo-Baukasten aus rosenweg-basis; dazu ein monochromes Designsymbol (Android 13+). Die wählbaren Symbolfarben von Fossify gibt es nicht mehr: alle zeigen dasselbe Rosenweg-Symbol.
 
 ## Installation
 
@@ -35,6 +37,12 @@ Die App baut gegen den Rosenweg-Fork der Fossify Commons und die Rosenweg-Module
 ```
 
 Die APK liegt danach unter `app/build/outputs/apk/foss/release/`. Signiert wird mit `keystore.properties` (Vorlage: `keystore.properties_sample`); die Datei und der Schlüssel liegen nicht im Repo. Paketname: `ch.rosenweg4303.messages`.
+
+Logo neu erzeugen (aus dem Repo-Wurzelverzeichnis, rosenweg-basis daneben): `sh assets/logo/erzeugen.sh`. Welches Zeichen die App trägt, steht in rosenweg-basis `werkzeug/logo/android-apps.txt`.
+
+## Neue Version
+
+APK wie oben bauen und signieren, dann `gh release create v<versionName> <datei.apk> --notes "Was ist neu"` (Tag = versionName der APK, eine APK je Release). Der Workflow `.github/workflows/apps.yml` (wiederverwendbarer Workflow `apps-release.yml` aus Rosenweg/Website) schickt sie an [www.rosenweg4303.ch/apps](https://www.rosenweg4303.ch/apps) und in den App-Katalog der Telefonanlage; damit bekommen sie die geteilten Telefone und der Rosenweg Updater. Anmeldung per GitHub-OIDC, kein gespeichertes Geheimnis; die Anlage prüft Tag, Prüfsumme, Rosenweg-Signatur und Paketnamen. Erneut senden: `gh workflow run apps.yml --ref <tag>`.
 
 ## Herkunft und Lizenz
 
