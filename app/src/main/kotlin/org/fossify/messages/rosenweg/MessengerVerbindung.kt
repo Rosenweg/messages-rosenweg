@@ -63,7 +63,6 @@ class MessengerVerbindung : Service() {
         private const val NOTIF_ID = 4303
         private const val AKTION_SENDEN = "ch.rosenweg4303.messages.SENDEN"
         private const val VERZEICHNIS_ALTER_MS = 60 * 60 * 1000L
-        private const val MAX_WARTEN_S = 300L
 
         @Volatile
         private var laeuft = false
@@ -75,8 +74,14 @@ class MessengerVerbindung : Service() {
         fun starteWennKonto(context: Context) {
             val app = context.applicationContext
             ensureBackgroundThread {
-                // eigenes Handy: auch ohne Netz starten, der Dienst versucht es dann selbst weiter
-                if (RosenwegKonto.hole(app) != null || RosenwegPrivatAnmeldung.privat(app) && RosenwegPrivatAnmeldung.angemeldet(app)) {
+                // eigenes Handy: ohne Anfrage hier starten - der Dienst fragt selbst (mit Wartezeit nach
+                // Fehlern), sonst kaeme bei jedem Oeffnen der App eine Anfrage an der Wartezeit vorbei
+                val starten = if (RosenwegPrivatAnmeldung.privat(app)) {
+                    RosenwegPrivatAnmeldung.angemeldet(app)
+                } else {
+                    RosenwegKonto.hole(app) != null
+                }
+                if (starten) {
                     try {
                         ContextCompat.startForegroundService(app, Intent(app, MessengerVerbindung::class.java))
                     } catch (e: Exception) {
@@ -187,7 +192,10 @@ class MessengerVerbindung : Service() {
     private var generation = 0
     private var verbunden = false
     private var verbindetGerade = false
-    private var wartenS = 2L
+    /** Zurueckhalten nach Fehlern, dauerhaft (nie im Sekundentakt, CrowdSec) */
+    private val zurueck by lazy { RwZurueckhalten.fuer(this) }
+    /** CONNACK 4/5 hintereinander (Broker lehnt die Anmeldung ab) */
+    private var brokerAbgelehnt = 0
     private var geplant: ScheduledFuture<*>? = null
     private var erneuerung: ScheduledFuture<*>? = null
     private var konto: RosenwegKonto? = null
@@ -218,7 +226,6 @@ class MessengerVerbindung : Service() {
             if (verbunden) {
                 if (senden) sendeAusstehendeJetzt()
             } else if (!verbindetGerade) {
-                wartenS = 2L
                 verbinde()
             }
         }
@@ -296,7 +303,8 @@ class MessengerVerbindung : Service() {
             override fun onAvailable(network: Network) {
                 arbeiter.execute {
                     if (!verbunden && !verbindetGerade) {
-                        wartenS = 2L
+                        // nur nach reinen Netzfehlern sofort; nach Serverfehlern gilt die Wartezeit
+                        zurueck.netzWiederDa()
                         geplant?.cancel(false)
                         verbinde()
                     }
@@ -315,6 +323,13 @@ class MessengerVerbindung : Service() {
 
     private fun verbinde() {
         if (arbeiter.isShutdown) return
+        // Alle Wege hierher (Start, App oeffnen, Netz, Ping, Inbox) halten die Wartezeit ein
+        if (!verbunden && !zurueck.darfJetzt()) {
+            if (geplant?.isDone != false) {
+                geplant = arbeiter.schedule({ if (!verbunden && !verbindetGerade) verbinde() }, zurueck.restMs() + 50, TimeUnit.MILLISECONDS)
+            }
+            return
+        }
         trenne(sauber = false)
         verbindetGerade = true
         val k = RosenwegKonto.hole(this, erzwingen = kontoNeuHolen)
@@ -323,7 +338,7 @@ class MessengerVerbindung : Service() {
             // eigenes Handy, Zugang noch da, aber Website gerade nicht erreichbar: spaeter nochmals
             Log.i(TAG, "Messenger-Token nicht erhalten - neuer Versuch spaeter")
             verbindetGerade = false
-            planeNeuversuch()
+            planeNeuversuch(RosenwegKonto.letzterFehler)
             return
         }
         if (k == null) {
@@ -349,6 +364,9 @@ class MessengerVerbindung : Service() {
             val deviceId = s.geraeteId
             try {
                 api.registriereGeraet(deviceId, "Rosenweg Messenger (${Build.MODEL})", s.oeffentlichRoh)
+            } catch (e: RosenwegApi.HttpFehler) {
+                if (RwZurueckhalten.istAbgelehnt(e.code)) throw e   // nicht noch /api/token hinterher
+                Log.w(TAG, "Geraet nicht registriert", e)
             } catch (e: Exception) {
                 Log.w(TAG, "Geraet nicht registriert", e)
             }
@@ -398,10 +416,17 @@ class MessengerVerbindung : Service() {
         } catch (e: Exception) {
             Log.w(TAG, "Verbindung fehlgeschlagen", e)
             verbindetGerade = false
-            if (e is RosenwegApi.HttpFehler && e.code == 401) {
+            if (e is RosenwegApi.HttpFehler && RwZurueckhalten.istAbgelehnt(e.code)) {
                 RosenwegKonto.vergiss()
+                if (RosenwegPrivatAnmeldung.privat(this)) {
+                    // eigenes Handy: sofort aufhoeren, Anmeldeknopf zeigen (keine Wiederholung)
+                    Log.w(TAG, "message-store lehnt ab (HTTP ${e.code}) - angehalten, neu anmelden")
+                    RosenwegPrivatAnmeldung.markiereAbgelehnt(this)
+                    stopSelf()
+                    return
+                }
             }
-            planeNeuversuch()
+            planeNeuversuch(if (e is RosenwegApi.HttpFehler) RwZurueckhalten.Art.SERVER else RwZurueckhalten.Art.NETZ)
         }
     }
 
@@ -414,8 +439,15 @@ class MessengerVerbindung : Service() {
 
             override fun abgelehnt(code: Int) {
                 Log.w(TAG, "Broker lehnt ab: CONNACK $code")
-                // 4/5 = Anmeldung abgelehnt → beim naechsten Versuch Zugang + Token neu holen
-                if (code == 4 || code == 5) kontoNeuHolen = true
+                // 4/5 = Anmeldung abgelehnt → beim naechsten Versuch Zugang + Token neu holen;
+                // eigenes Handy: zweimal hintereinander abgelehnt → angehalten (Mosquitto-Log zaehlt fuer CrowdSec)
+                if (code == 4 || code == 5) {
+                    kontoNeuHolen = true
+                    brokerAbgelehnt++
+                    if (brokerAbgelehnt >= 2 && RosenwegPrivatAnmeldung.privat(this@MessengerVerbindung)) {
+                        RosenwegPrivatAnmeldung.markiereAbgelehnt(this@MessengerVerbindung)
+                    }
+                }
             }
 
             override fun nachricht(topic: String, payload: ByteArray, retained: Boolean) {
@@ -430,7 +462,7 @@ class MessengerVerbindung : Service() {
                     verbunden = false
                     verbindetGerade = false
                     stoppePingAlarm()
-                    planeNeuversuch()
+                    planeNeuversuch(if (brokerAbgelehnt > 0) RwZurueckhalten.Art.SERVER else RwZurueckhalten.Art.NETZ)
                 }
             }
         }, log = { msg, t -> Log.w(TAG, msg, t) })
@@ -463,7 +495,8 @@ class MessengerVerbindung : Service() {
         val c = client ?: return
         verbunden = true
         verbindetGerade = false
-        wartenS = 2L
+        zurueck.erfolg()
+        brokerAbgelehnt = 0
         c.publish(RosenwegTopics.presence(k.userId), bauePresence(true).toByteArray(), 1, true)
         val filter = ArrayList<String>()
         filter.add(RosenwegTopics.KRISE)
@@ -755,12 +788,17 @@ class MessengerVerbindung : Service() {
         }, PING_ANTWORT_MS, TimeUnit.MILLISECONDS)
     }
 
-    private fun planeNeuversuch() {
+    private fun planeNeuversuch(art: RwZurueckhalten.Art = RwZurueckhalten.Art.SERVER) {
         if (arbeiter.isShutdown) return
+        if (RosenwegPrivatAnmeldung.privat(this) && RosenwegPrivatAnmeldung.abgelehnt(this)) {
+            Log.i(TAG, "Anmeldung abgelehnt - kein neuer Versuch, Dienst endet")
+            stopSelf()
+            return
+        }
         geplant?.cancel(false)
-        val warte = wartenS
-        wartenS = (wartenS * 2).coerceAtMost(MAX_WARTEN_S)
-        geplant = arbeiter.schedule({ if (!verbunden && !verbindetGerade) verbinde() }, warte, TimeUnit.SECONDS)
+        val warte = zurueck.fehler(art)
+        Log.i(TAG, "neuer Versuch in ${warte / 1000} s ($art)")
+        geplant = arbeiter.schedule({ if (!verbunden && !verbindetGerade) verbinde() }, warte, TimeUnit.MILLISECONDS)
     }
 
     // ── Eingang (Arbeits-Thread) ────────────────────────────────────────

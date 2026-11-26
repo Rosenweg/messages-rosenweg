@@ -49,6 +49,7 @@ object RosenwegPrivatAnmeldung {
     private const val P_ZUGANG = "zugang"
     private const val P_GEHEIMNIS = "geheimnis"
     private const val P_NAME = "name"
+    private const val P_ABGELEHNT = "abgelehnt"
 
     /** Keystore-Alias des Schluessels fuer das Geheimnis (RosenwegAbmeldung loescht ihn mit) */
     const val ALIAS = "rw_privat_zugang"
@@ -65,6 +66,9 @@ object RosenwegPrivatAnmeldung {
     /** Zugang an der Website abgelehnt (geloescht/gesperrt) */
     class Widerrufen : IOException("Zugang widerrufen")
 
+    /** 403: Anfrage abgewiesen (z.B. Adresse von CrowdSec gesperrt) - nicht wiederholen */
+    class Abgelehnt : IOException("abgewiesen (403)")
+
     data class Token(val server: String, val token: String, val gueltigBisSek: Long)
 
     @Volatile
@@ -75,8 +79,24 @@ object RosenwegPrivatAnmeldung {
     /** Privates Telefon (kein Rosenweg Geraet)? Nur dort meldet sich der Messenger selbst an. */
     fun privat(c: Context) = !RosenwegSmsModus.geraetDa(c)
 
-    /** Ist auf diesem Handy ein eigener Messenger-Zugang gespeichert? */
-    fun angemeldet(c: Context) = prefs(c).getString(P_ZUGANG, null) != null && prefs(c).getString(P_GEHEIMNIS, null) != null
+    /** Ist ein eigener Zugang gespeichert (auch wenn er gerade abgelehnt wurde)? */
+    fun hatZugang(c: Context) = prefs(c).getString(P_ZUGANG, null) != null && prefs(c).getString(P_GEHEIMNIS, null) != null
+
+    /**
+     * Angemeldet und nicht angehalten. Nach 401/403 (message-store, Broker zweimal, Website 403) ist
+     * der Zugang "abgelehnt": keine Anfragen mehr, bis die Person sich neu anmeldet. Die Chats bleiben
+     * (neu angemeldet mit demselben Konto geht es dort weiter).
+     */
+    fun angemeldet(c: Context) = hatZugang(c) && !abgelehnt(c)
+
+    fun abgelehnt(c: Context) = prefs(c).getBoolean(P_ABGELEHNT, false)
+
+    fun markiereAbgelehnt(c: Context) {
+        if (!abgelehnt(c)) {
+            prefs(c).edit().putBoolean(P_ABGELEHNT, true).commit()
+            Log.i(TAG, "angehalten: Anmeldung abgelehnt")
+        }
+    }
 
     fun name(c: Context): String? = prefs(c).getString(P_NAME, null)?.takeIf { it.isNotBlank() }
 
@@ -140,13 +160,22 @@ object RosenwegPrivatAnmeldung {
             val zugang = j.optString("zugang")
             val geheimnis = j.optString("geheimnis")
             if (zugang.isEmpty() || geheimnis.isEmpty()) throw Fehler("Antwort ohne Zugang")
+            val alterZugang = zugangsdaten(app)
             prefs(app).edit()
+                .remove(P_ABGELEHNT)
                 .putString(P_ZUGANG, zugang)
                 .putString(P_GEHEIMNIS, verschluesseln(geheimnis))
                 .putString(P_NAME, j.optString("name"))
                 .commit()
             // Die Authentik-Anmeldung braucht der Messenger nicht mehr: der Zugang ist der Ausweis.
             RosenwegAnmeldung.abmelden(app)
+            // abgelehnter alter Zugang: an der Website aufraeumen (einmal, Ergebnis egal)
+            if (alterZugang != null && alterZugang.first != zugang) {
+                try {
+                    post("/api/messenger/zugang/abmelden", JSONObject().put("zugang", alterZugang.first).put("geheimnis", alterZugang.second), null)
+                } catch (_: Exception) {
+                }
+            }
             Log.i(TAG, "Zugang eingerichtet")
         } finally {
             richtetEin = false
@@ -158,12 +187,14 @@ object RosenwegPrivatAnmeldung {
      * Wirft [Widerrufen] (Zugang weg - der Aufrufer meldet ab) oder IOException (Netz).
      */
     fun messengerToken(c: Context): Token? {
+        if (abgelehnt(c)) return null
         val (zugang, geheimnis) = zugangsdaten(c) ?: return null
         val (status, j) = post("/api/messenger/zugang/token", JSONObject().put("zugang", zugang).put("geheimnis", geheimnis), null)
         when (status) {
             200 -> {}
             401 -> throw Widerrufen()
-            else -> throw IOException("Messenger-Token: $status")
+            403 -> throw Abgelehnt()
+            else -> throw RosenwegApi.HttpFehler(status, "Messenger-Token: $status")
         }
         val server = j.optString("server").trimEnd('/')
         val token = j.optString("token")
