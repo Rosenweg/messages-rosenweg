@@ -31,7 +31,7 @@ app-build-kotlinJVMTarget = "17"
 #Helpers
 ez-vcard = "0.12.2"
 #Rosenweg Messenger
-okhttp = "4.12.0"
+okhttp = "5.5.1"
 junit = "4.13.2"
 [libraries]
 #AndroidX
