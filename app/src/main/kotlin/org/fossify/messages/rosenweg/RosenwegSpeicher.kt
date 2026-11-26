@@ -1,5 +1,6 @@
 package org.fossify.messages.rosenweg
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.provider.Telephony
 import android.util.Log
@@ -42,6 +43,8 @@ class RosenwegSpeicher private constructor(context: Context) {
         const val NAME_DU = "Du"
         const val NAME_UNBEKANNT = "Unbekannt"
 
+        // Haelt nur den applicationContext (siehe app), kein Activity-Leak.
+        @SuppressLint("StaticFieldLeak")
         @Volatile
         private var instanz: RosenwegSpeicher? = null
 

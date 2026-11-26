@@ -3,29 +3,60 @@
   <ManuallySuppressedIssues/>
   <CurrentIssues>
     <ID>ComplexCondition:Activity.kt$contact.rawId &gt; 1000000 &amp;&amp; contact.contactId &gt; 1000000 &amp;&amp; contact.rawId == contact.contactId &amp;&amp; (isPackageInstalled(simpleContacts) || isPackageInstalled(simpleContactsDebug))</ID>
+    <ID>ComplexCondition:MainActivity.kt$MainActivity$abgelehntGezeigt || isFinishing || smsModus == RosenwegSmsModus.Modus.GETEILT || !RosenwegPrivatAnmeldung.abgelehnt(this) || RosenwegPrivatAnmeldung.ausstehend(this)</ID>
+    <ID>ComplexCondition:MessengerVerbindung.kt$MessengerVerbindung$e.neu &amp;&amp; e.nachricht.senderId != speicher.eigeneId &amp;&amp; System.currentTimeMillis() - d.ts &lt; 10 * 60_000 &amp;&amp; (RosenwegNotfall.istNotfall(chat.id, d.priority) || (chat.id == "notfall" &amp;&amp; (d.clear || RosenwegNotfall.istEntwarnung(d.body)))) &amp;&amp; e.nachricht.rcptSoll &lt; RwQuittung.GELESEN</ID>
     <ID>ComplexCondition:NewConversationActivity.kt$NewConversationActivity$contact.phoneNumbers.any { it.normalizedNumber.contains(searchString, true) } || contact.name.contains(searchString, true) || contact.name.contains(searchString.normalizeString(), true) || contact.name.normalizeString().contains(searchString, true)</ID>
+    <ID>ComplexCondition:RosenwegProtokoll.kt$d != null &amp;&amp; !t.contains('e', true) &amp;&amp; d == Math.floor(d) &amp;&amp; t.contains('.')</ID>
+    <ID>ComplexCondition:ThreadAdapter.kt$ThreadAdapter$id == R.id.cab_rw_antworten || id == R.id.cab_rw_reagieren || id == R.id.cab_rw_bearbeiten || id == R.id.cab_rw_loeschen</ID>
     <ID>CyclomaticComplexMethod:Context.kt$fun Context.getConversations( threadId: Long? = null, privateContacts: ArrayList&lt;SimpleContact&gt; = ArrayList(), ): ArrayList&lt;Conversation&gt;</ID>
     <ID>CyclomaticComplexMethod:ConversationsAdapter.kt$ConversationsAdapter$override fun actionItemPressed(id: Int)</ID>
     <ID>CyclomaticComplexMethod:MainActivity.kt$MainActivity$private fun getNewConversations(cachedConversations: ArrayList&lt;Conversation&gt;)</ID>
     <ID>CyclomaticComplexMethod:MessagesImporter.kt$MessagesImporter$private fun InputStream.importXml()</ID>
+    <ID>CyclomaticComplexMethod:Messaging.kt$fun Context.sendMessageCompat( text: String, addresses: List&lt;String&gt;, subId: Int?, attachments: List&lt;Attachment&gt;, messageId: Long? = null )</ID>
+    <ID>CyclomaticComplexMethod:MessengerVerbindung.kt$MessengerVerbindung$private fun eingang(topic: String, text: String)</ID>
+    <ID>CyclomaticComplexMethod:MessengerVerbindung.kt$MessengerVerbindung$private fun holeVerlauf()</ID>
+    <ID>CyclomaticComplexMethod:MessengerVerbindung.kt$MessengerVerbindung$private fun schiebeBackfill()</ID>
+    <ID>CyclomaticComplexMethod:MessengerVerbindung.kt$MessengerVerbindung$private fun sendeAusstehendeJetzt()</ID>
+    <ID>CyclomaticComplexMethod:MessengerVerbindung.kt$MessengerVerbindung$private fun sendeQuittungen()</ID>
+    <ID>CyclomaticComplexMethod:MessengerVerbindung.kt$MessengerVerbindung$private fun verbinde()</ID>
     <ID>CyclomaticComplexMethod:NotificationHelper.kt$NotificationHelper$@SuppressLint("NewApi") fun showMessageNotification( messageId: Long, isMms: Boolean, address: String, body: String, threadId: Long, bitmap: Bitmap?, sender: String?, alertOnlyOnce: Boolean = false )</ID>
+    <ID>CyclomaticComplexMethod:RosenwegAbmeldung.kt$RosenwegAbmeldung$@Synchronized fun allesLoeschen(context: Context)</ID>
+    <ID>CyclomaticComplexMethod:RosenwegProtokoll.kt$fun parseSteuerung(payload: String, jetztMs: Long = System.currentTimeMillis()): RwSteuerung?</ID>
+    <ID>CyclomaticComplexMethod:RosenwegProtokoll.kt$fun parseVerlauf(text: String): List&lt;RwNachrichtDaten&gt;</ID>
+    <ID>CyclomaticComplexMethod:RosenwegSpeicher.kt$RosenwegSpeicher$fun gleicheGespraecheAb( liste: List&lt;RwGespraechDaten&gt;, pubTopics: List&lt;String&gt;?, mitgliederJeChat: Map&lt;String, List&lt;String&gt;&gt;, istAdmin: Boolean = false, ): List&lt;RwChat&gt;</ID>
+    <ID>CyclomaticComplexMethod:RosenwegSpeicher.kt$RosenwegSpeicher$fun nimmAuf(chat: RwChat, d: RwNachrichtDaten, ausVerlauf: Boolean, gelesen: Boolean): Eingang</ID>
+    <ID>CyclomaticComplexMethod:ThreadActivity.kt$ThreadActivity$@Subscribe(threadMode = ThreadMode.ASYNC) fun refreshMessages(@Suppress("unused") event: Events.RefreshMessages)</ID>
+    <ID>CyclomaticComplexMethod:ThreadActivity.kt$ThreadActivity$@SuppressLint("MissingPermission") private fun getThreadItems(): List&lt;ThreadItem&gt;</ID>
     <ID>CyclomaticComplexMethod:ThreadActivity.kt$ThreadActivity$private fun refreshMenuItems()</ID>
     <ID>CyclomaticComplexMethod:ThreadActivity.kt$ThreadActivity$private fun setupButtons()</ID>
     <ID>CyclomaticComplexMethod:ThreadActivity.kt$ThreadActivity$private fun setupThread(callback: () -&gt; Unit)</ID>
+    <ID>CyclomaticComplexMethod:ThreadAdapter.kt$ThreadAdapter$override fun actionItemPressed(id: Int)</ID>
+    <ID>CyclomaticComplexMethod:ThreadAdapter.kt$ThreadAdapter$override fun prepareActionMode(menu: Menu)</ID>
+    <ID>CyclomaticComplexMethod:ThreadAdapter.kt$ThreadAdapter$private fun setupView(holder: ViewHolder, view: View, message: Message)</ID>
     <ID>EmptyCatchBlock:MessagesWriter.kt$MessagesWriter${ }</ID>
+    <ID>EmptyElseBlock:BrokerProbeTest.kt$BrokerProbeTest.&lt;no name provided&gt;$if (code == null) fehler = grund</ID>
     <ID>EmptyFunctionBlock:ArchivedConversationsAdapter.kt$ArchivedConversationsAdapter${}</ID>
     <ID>EmptyFunctionBlock:BaseConversationsAdapter.kt$BaseConversationsAdapter${}</ID>
+    <ID>EmptyFunctionBlock:BrokerProbeTest.kt$BrokerProbeTest.&lt;no name provided&gt;${}</ID>
     <ID>EmptyFunctionBlock:ContactsAdapter.kt$ContactsAdapter${}</ID>
     <ID>EmptyFunctionBlock:ManageBlockedKeywordsAdapter.kt$ManageBlockedKeywordsAdapter${}</ID>
     <ID>EmptyFunctionBlock:RecycleBinConversationsAdapter.kt$RecycleBinConversationsAdapter${}</ID>
+    <ID>EmptyFunctionBlock:RosenwegGruppeActivity.kt$RosenwegGruppeActivity.&lt;no name provided&gt;${}</ID>
     <ID>EmptyFunctionBlock:SearchResultsAdapter.kt$SearchResultsAdapter${}</ID>
     <ID>EmptyFunctionBlock:ThreadAdapter.kt$ThreadAdapter${}</ID>
     <ID>ForbiddenComment:MainActivity.kt$MainActivity$// FIXME: Scheduled message date is being reset here. Conversations with</ID>
     <ID>ForbiddenComment:ShortcutHelper.kt$ShortcutHelper$// TODO: verify that thread isn't in recycle bin</ID>
     <ID>ForbiddenComment:SmsStatusDeliveredReceiver.kt$SmsStatusDeliveredReceiver$// TODO: Need to check whether SC still trying to deliver the SMS to destination and will send the report again?</ID>
     <ID>FunctionParameterNaming:Config.kt$Config$SIMId: Int</ID>
+    <ID>InstanceOfCheckForException:MessengerVerbindung.kt$MessengerVerbindung$e is RosenwegApi.HttpFehler</ID>
+    <ID>InstanceOfCheckForException:RosenwegKonto.kt$RosenwegKonto.Companion$e is RosenwegApi.HttpFehler</ID>
+    <ID>LargeClass:MainActivity.kt$MainActivity : SimpleActivity</ID>
+    <ID>LargeClass:MessengerVerbindung.kt$MessengerVerbindung : Service</ID>
     <ID>LargeClass:ThreadActivity.kt$ThreadActivity : SimpleActivity</ID>
     <ID>LongMethod:NotificationHelper.kt$NotificationHelper$@SuppressLint("NewApi") fun showMessageNotification( messageId: Long, isMms: Boolean, address: String, body: String, threadId: Long, bitmap: Bitmap?, sender: String?, alertOnlyOnce: Boolean = false )</ID>
+    <ID>LoopWithTooManyJumpStatements:MessengerVerbindung.kt$MessengerVerbindung$for</ID>
+    <ID>LoopWithTooManyJumpStatements:MessengerVerbindung.kt$MessengerVerbindung$while</ID>
+    <ID>LoopWithTooManyJumpStatements:MqttCodec.kt$MqttDekoder$while</ID>
     <ID>MagicNumber:Activity.kt$1000000</ID>
     <ID>MagicNumber:BaseConversationsAdapter.kt$BaseConversationsAdapter$0.7f</ID>
     <ID>MagicNumber:BaseConversationsAdapter.kt$BaseConversationsAdapter$0.8f</ID>
@@ -44,6 +75,131 @@
     <ID>MagicNumber:ImageCompressor.kt$ImageCompressor$8</ID>
     <ID>MagicNumber:ImageCompressor.kt$ImageCompressor$90f</ID>
     <ID>MagicNumber:MainActivity.kt$MainActivity$30</ID>
+    <ID>MagicNumber:MessengerVerbindung.kt$MessengerVerbindung$10</ID>
+    <ID>MagicNumber:MessengerVerbindung.kt$MessengerVerbindung$12</ID>
+    <ID>MagicNumber:MessengerVerbindung.kt$MessengerVerbindung$120</ID>
+    <ID>MagicNumber:MessengerVerbindung.kt$MessengerVerbindung$1500</ID>
+    <ID>MagicNumber:MessengerVerbindung.kt$MessengerVerbindung$20</ID>
+    <ID>MagicNumber:MessengerVerbindung.kt$MessengerVerbindung$200</ID>
+    <ID>MagicNumber:MessengerVerbindung.kt$MessengerVerbindung$24</ID>
+    <ID>MagicNumber:MessengerVerbindung.kt$MessengerVerbindung$45L</ID>
+    <ID>MagicNumber:MessengerVerbindung.kt$MessengerVerbindung$50</ID>
+    <ID>MagicNumber:MessengerVerbindung.kt$MessengerVerbindung$500</ID>
+    <ID>MagicNumber:MessengerVerbindung.kt$MessengerVerbindung$60</ID>
+    <ID>MagicNumber:MessengerVerbindung.kt$MessengerVerbindung$60_000</ID>
+    <ID>MagicNumber:MessengerVerbindung.kt$MessengerVerbindung.&lt;no name provided&gt;$4</ID>
+    <ID>MagicNumber:MessengerVerbindung.kt$MessengerVerbindung.&lt;no name provided&gt;$5</ID>
+    <ID>MagicNumber:MessengerVerbindung.kt$RosenwegPingReceiver$15_000L</ID>
+    <ID>MagicNumber:MqttCodec.kt$MqttCodec$0x04</ID>
+    <ID>MagicNumber:MqttCodec.kt$MqttCodec$0x08</ID>
+    <ID>MagicNumber:MqttCodec.kt$MqttCodec$0x20</ID>
+    <ID>MagicNumber:MqttCodec.kt$MqttCodec$0x40</ID>
+    <ID>MagicNumber:MqttCodec.kt$MqttCodec$0xFF</ID>
+    <ID>MagicNumber:MqttCodec.kt$MqttCodec$0xFFFF</ID>
+    <ID>MagicNumber:MqttCodec.kt$MqttCodec$3</ID>
+    <ID>MagicNumber:MqttCodec.kt$MqttCodec$4</ID>
+    <ID>MagicNumber:MqttCodec.kt$MqttCodec$8</ID>
+    <ID>MagicNumber:MqttCodec.kt$MqttDekoder$0x7F</ID>
+    <ID>MagicNumber:MqttCodec.kt$MqttDekoder$0xFF</ID>
+    <ID>MagicNumber:MqttCodec.kt$MqttDekoder$4</ID>
+    <ID>MagicNumber:NotfallActivity.kt$NotfallActivity$18f</ID>
+    <ID>MagicNumber:NotfallActivity.kt$NotfallActivity$20f</ID>
+    <ID>MagicNumber:NotfallActivity.kt$NotfallActivity$24</ID>
+    <ID>MagicNumber:NotfallActivity.kt$NotfallActivity$26f</ID>
+    <ID>MagicNumber:NotfallActivity.kt$NotfallActivity$32</ID>
+    <ID>MagicNumber:NotfallActivity.kt$NotfallActivity$40f</ID>
+    <ID>MagicNumber:NotfallActivity.kt$NotfallActivity$48</ID>
+    <ID>MagicNumber:NotfallActivity.kt$NotfallActivity$8</ID>
+    <ID>MagicNumber:RosenwegApi.kt$RosenwegApi$3600L</ID>
+    <ID>MagicNumber:RosenwegAvatare.kt$RosenwegAvatare$0.55f</ID>
+    <ID>MagicNumber:RosenwegAvatare.kt$RosenwegAvatare$0xEC</ID>
+    <ID>MagicNumber:RosenwegAvatare.kt$RosenwegAvatare$0xEF</ID>
+    <ID>MagicNumber:RosenwegAvatare.kt$RosenwegAvatare$0xF1</ID>
+    <ID>MagicNumber:RosenwegAvatare.kt$RosenwegAvatare$100</ID>
+    <ID>MagicNumber:RosenwegAvatare.kt$RosenwegAvatare$192</ID>
+    <ID>MagicNumber:RosenwegDatenbank.kt$RosenwegDatenbank.Companion.&lt;no name provided&gt;$3</ID>
+    <ID>MagicNumber:RosenwegDatenbank.kt$RosenwegDatenbank.Companion.&lt;no name provided&gt;$4</ID>
+    <ID>MagicNumber:RosenwegDatenbank.kt$RosenwegDatenbank.Companion.&lt;no name provided&gt;$5</ID>
+    <ID>MagicNumber:RosenwegGruppeActivity.kt$RosenwegGruppeActivity$0.7f</ID>
+    <ID>MagicNumber:RosenwegGruppeActivity.kt$RosenwegGruppeActivity$0.8</ID>
+    <ID>MagicNumber:RosenwegGruppeActivity.kt$RosenwegGruppeActivity$10</ID>
+    <ID>MagicNumber:RosenwegGruppeActivity.kt$RosenwegGruppeActivity$40</ID>
+    <ID>MagicNumber:RosenwegGruppeActivity.kt$RosenwegGruppeActivity$8</ID>
+    <ID>MagicNumber:RosenwegGruppeActivity.kt$RosenwegGruppeActivity$85</ID>
+    <ID>MagicNumber:RosenwegHooks.kt$RosenwegHooks$1500L</ID>
+    <ID>MagicNumber:RosenwegHooks.kt$RosenwegHooks$3_000</ID>
+    <ID>MagicNumber:RosenwegHooks.kt$RosenwegHooks$401</ID>
+    <ID>MagicNumber:RosenwegHooks.kt$RosenwegHooks$403</ID>
+    <ID>MagicNumber:RosenwegHooks.kt$RosenwegHooks$404</ID>
+    <ID>MagicNumber:RosenwegHooks.kt$RosenwegHooks$80</ID>
+    <ID>MagicNumber:RosenwegKonto.kt$RosenwegKonto.Companion$60_000</ID>
+    <ID>MagicNumber:RosenwegMedien.kt$RosenwegMedien$1024</ID>
+    <ID>MagicNumber:RosenwegMedien.kt$RosenwegMedien$12</ID>
+    <ID>MagicNumber:RosenwegMedien.kt$RosenwegMedien$32</ID>
+    <ID>MagicNumber:RosenwegMedien.kt$RosenwegMedien$64</ID>
+    <ID>MagicNumber:RosenwegNotfall.kt$RosenwegNotfall$150</ID>
+    <ID>MagicNumber:RosenwegNotfall.kt$RosenwegNotfall$300</ID>
+    <ID>MagicNumber:RosenwegNotfall.kt$RosenwegNotfall$30_000L</ID>
+    <ID>MagicNumber:RosenwegNotfall.kt$RosenwegNotfall$4306</ID>
+    <ID>MagicNumber:RosenwegNotfall.kt$RosenwegNotfall$600</ID>
+    <ID>MagicNumber:RosenwegNotfall.kt$RosenwegNotfall$800</ID>
+    <ID>MagicNumber:RosenwegNotfall.kt$RosenwegNotfall.Sirene$0.5</ID>
+    <ID>MagicNumber:RosenwegNotfall.kt$RosenwegNotfall.Sirene$0.9</ID>
+    <ID>MagicNumber:RosenwegNotfall.kt$RosenwegNotfall.Sirene$1.6</ID>
+    <ID>MagicNumber:RosenwegNotfall.kt$RosenwegNotfall.Sirene$10</ID>
+    <ID>MagicNumber:RosenwegNotfall.kt$RosenwegNotfall.Sirene$1600</ID>
+    <ID>MagicNumber:RosenwegNotfall.kt$RosenwegNotfall.Sirene$22050</ID>
+    <ID>MagicNumber:RosenwegNotfall.kt$RosenwegNotfall.Sirene$300</ID>
+    <ID>MagicNumber:RosenwegNotfall.kt$RosenwegNotfall.Sirene$660.0</ID>
+    <ID>MagicNumber:RosenwegNotfall.kt$RosenwegNotfall.Sirene$7</ID>
+    <ID>MagicNumber:RosenwegNotfall.kt$RosenwegNotfall.Sirene$880.0</ID>
+    <ID>MagicNumber:RosenwegNotfall.kt$RosenwegNotfall.Sirene$900</ID>
+    <ID>MagicNumber:RosenwegPrivatAnmeldung.kt$RosenwegPrivatAnmeldung$10</ID>
+    <ID>MagicNumber:RosenwegPrivatAnmeldung.kt$RosenwegPrivatAnmeldung$15</ID>
+    <ID>MagicNumber:RosenwegPrivatAnmeldung.kt$RosenwegPrivatAnmeldung$200</ID>
+    <ID>MagicNumber:RosenwegPrivatAnmeldung.kt$RosenwegPrivatAnmeldung$401</ID>
+    <ID>MagicNumber:RosenwegPrivatAnmeldung.kt$RosenwegPrivatAnmeldung$403</ID>
+    <ID>MagicNumber:RosenwegProtokoll.kt$100_000_000_000L</ID>
+    <ID>MagicNumber:RosenwegProtokoll.kt$120</ID>
+    <ID>MagicNumber:RosenwegProtokoll.kt$3</ID>
+    <ID>MagicNumber:RosenwegProtokoll.kt$90</ID>
+    <ID>MagicNumber:RosenwegProtokoll.kt$RosenwegIds$6</ID>
+    <ID>MagicNumber:RosenwegProtokoll.kt$RosenwegTopics$3</ID>
+    <ID>MagicNumber:RosenwegProtokoll.kt$RwQuittung$3</ID>
+    <ID>MagicNumber:RosenwegSpeicher.kt$RosenwegSpeicher$200</ID>
+    <ID>MagicNumber:RosenwegSpeicher.kt$RosenwegSpeicher$24</ID>
+    <ID>MagicNumber:RosenwegSpeicher.kt$RosenwegSpeicher$60</ID>
+    <ID>MagicNumber:RosenwegSpeicher.kt$RosenwegSpeicher$7L</ID>
+    <ID>MagicNumber:RosenwegSpeicher.kt$RosenwegSpeicher$80</ID>
+    <ID>MagicNumber:RosenwegSpeicher.kt$RosenwegSpeicher$90</ID>
+    <ID>MagicNumber:RwGeraeteSchluessel.kt$RwGeraeteSchluessel.Companion$12</ID>
+    <ID>MagicNumber:RwGeraeteSchluessel.kt$RwGeraeteSchluessel.Companion$16</ID>
+    <ID>MagicNumber:RwGeraeteSchluessel.kt$RwGeraeteSchluessel.Companion$20</ID>
+    <ID>MagicNumber:RwGeraeteSchluessel.kt$RwGeraeteSchluessel.Companion$32</ID>
+    <ID>MagicNumber:RwGeraeteSchluessel.kt$RwGeraeteSchluessel.Companion$8</ID>
+    <ID>MagicNumber:RwKrypto.kt$RwKrypto$12</ID>
+    <ID>MagicNumber:RwKrypto.kt$RwKrypto$32</ID>
+    <ID>MagicNumber:RwKrypto.kt$RwKrypto$33</ID>
+    <ID>MagicNumber:RwKrypto.kt$RwKrypto$4</ID>
+    <ID>MagicNumber:RwKrypto.kt$RwKrypto$65</ID>
+    <ID>MagicNumber:RwMqttClient.kt$RwMqttClient$0xFFFF</ID>
+    <ID>MagicNumber:RwMqttClient.kt$RwMqttClient$15_000</ID>
+    <ID>MagicNumber:RwMqttClient.kt$RwMqttClient$50</ID>
+    <ID>MagicNumber:RwZitat.kt$RwZitat$0.35f</ID>
+    <ID>MagicNumber:RwZitat.kt$RwZitat$0.5</ID>
+    <ID>MagicNumber:RwZitat.kt$RwZitat$0.88f</ID>
+    <ID>MagicNumber:RwZitat.kt$RwZitat$0x22</ID>
+    <ID>MagicNumber:RwZitat.kt$RwZitat$0xC0</ID>
+    <ID>MagicNumber:RwZitat.kt$RwZitat$110</ID>
+    <ID>MagicNumber:RwZitat.kt$RwZitat$12</ID>
+    <ID>MagicNumber:RwZitat.kt$RwZitat$3</ID>
+    <ID>MagicNumber:RwZitat.kt$RwZitat$6</ID>
+    <ID>MagicNumber:RwZitat.kt$RwZitat$8</ID>
+    <ID>MagicNumber:RwZurueckhalten.kt$RwZurueckhalten.Companion$0.4</ID>
+    <ID>MagicNumber:RwZurueckhalten.kt$RwZurueckhalten.Companion$0.8</ID>
+    <ID>MagicNumber:RwZurueckhalten.kt$RwZurueckhalten.Companion$16</ID>
+    <ID>MagicNumber:RwZurueckhalten.kt$RwZurueckhalten.Companion$401</ID>
+    <ID>MagicNumber:RwZurueckhalten.kt$RwZurueckhalten.Companion$403</ID>
     <ID>MagicNumber:ScheduleMessageDialog.kt$ScheduleMessageDialog$23</ID>
     <ID>MagicNumber:ScheduleMessageDialog.kt$ScheduleMessageDialog$5</ID>
     <ID>MagicNumber:ScheduleMessageDialog.kt$ScheduleMessageDialog$59</ID>
@@ -67,7 +223,11 @@
     <ID>MagicNumber:ThreadActivity.kt$ThreadActivity$2</ID>
     <ID>MagicNumber:ThreadActivity.kt$ThreadActivity$30</ID>
     <ID>MagicNumber:ThreadActivity.kt$ThreadActivity$500L</ID>
+    <ID>MagicNumber:ThreadActivity.kt$ThreadActivity$6_500</ID>
+    <ID>MagicNumber:ThreadAdapter.kt$ThreadAdapter$0.25f</ID>
+    <ID>MagicNumber:ThreadAdapter.kt$ThreadAdapter$0.6f</ID>
     <ID>MagicNumber:ThreadAdapter.kt$ThreadAdapter$0.8f</ID>
+    <ID>MagicNumber:ThreadAdapter.kt$ThreadAdapter$10</ID>
     <ID>MagicNumber:ThreadAdapter.kt$ThreadAdapter$4</ID>
     <ID>MagicNumber:VCardViewerAdapter.kt$VCardViewerAdapter.VCardContactViewHolder$1.1f</ID>
     <ID>MagicNumber:VCardViewerAdapter.kt$VCardViewerAdapter.VCardPropertyViewHolder$1.1f</ID>
@@ -76,8 +236,10 @@
     <ID>MaxLineLength:ArchivedConversationsAdapter.kt$ArchivedConversationsAdapter$val conversationsToRemove = currentList.filter { selectedKeys.contains(it.hashCode()) } as ArrayList&lt;Conversation&gt;</ID>
     <ID>MaxLineLength:ArchivedConversationsAdapter.kt$ArchivedConversationsAdapter$val conversationsToUnarchive = currentList.filter { selectedKeys.contains(it.hashCode()) } as ArrayList&lt;Conversation&gt;</ID>
     <ID>MaxLineLength:AutoCompleteTextViewAdapter.kt$AutoCompleteTextViewAdapter$class</ID>
+    <ID>MaxLineLength:BaseConversationsAdapter.kt$BaseConversationsAdapter$text = smsDraft ?: if (conversation.threadId &lt; 0) org.fossify.messages.rosenweg.ausschnitt(conversation.snippet) else conversation.snippet</ID>
     <ID>MaxLineLength:Constants.kt$/** Not to be used with real messages persisted in the telephony db. This is for internal use only (e.g. scheduled messages, notification ids etc). */</ID>
     <ID>MaxLineLength:ContactsAdapter.kt$ContactsAdapter$activity: SimpleActivity</ID>
+    <ID>MaxLineLength:Context.kt$android.util.Log.i("RosenwegSpeicher", "Fossify leert den Nachrichten-Cache (wasDbCleared=false): $n SMS-Zeilen, Rosenweg bleibt")</ID>
     <ID>MaxLineLength:ConversationsDao.kt$ConversationsDao$@Query("SELECT (SELECT body FROM messages LEFT OUTER JOIN recycle_bin_messages ON messages.id = recycle_bin_messages.id WHERE recycle_bin_messages.id IS NOT NULL AND messages.thread_id = conversations.thread_id ORDER BY messages.date DESC LIMIT 1) as new_snippet, * FROM conversations WHERE (SELECT COUNT(*) FROM messages LEFT OUTER JOIN recycle_bin_messages ON messages.id = recycle_bin_messages.id WHERE recycle_bin_messages.id IS NOT NULL AND messages.thread_id = conversations.thread_id) &gt; 0")</ID>
     <ID>MaxLineLength:ConversationsDao.kt$ConversationsDao$@Query("SELECT (SELECT body FROM messages LEFT OUTER JOIN recycle_bin_messages ON messages.id = recycle_bin_messages.id WHERE recycle_bin_messages.id IS NULL AND messages.thread_id = conversations.thread_id ORDER BY messages.date DESC LIMIT 1) as new_snippet, * FROM conversations WHERE archived = 0")</ID>
     <ID>MaxLineLength:ConversationsDao.kt$ConversationsDao$@Query("SELECT (SELECT body FROM messages LEFT OUTER JOIN recycle_bin_messages ON messages.id = recycle_bin_messages.id WHERE recycle_bin_messages.id IS NULL AND messages.thread_id = conversations.thread_id ORDER BY messages.date DESC LIMIT 1) as new_snippet, * FROM conversations WHERE archived = 1")</ID>
@@ -87,6 +249,7 @@
     <ID>MaxLineLength:ImageCompressor.kt$ImageCompressor$fun</ID>
     <ID>MaxLineLength:ImageCompressor.kt$ImageCompressor$private</ID>
     <ID>MaxLineLength:ImageCompressor.kt$ImageCompressor$var imageFile = File(outputDirectory, System.currentTimeMillis().toString().plus(mimeType.getExtensionFromMimeType()))</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$findItem(R.id.rw_standard_sms).isVisible = nurMessenger &amp;&amp; RosenwegSmsModus.istStandardSmsApp(this@MainActivity)</ID>
     <ID>MaxLineLength:MessagesDatabase.kt$MessagesDatabase.Companion.&lt;no name provided&gt;$"INSERT OR IGNORE INTO conversations_new (thread_id, snippet, date, read, title, photo_uri, is_group_conversation, phone_number) "</ID>
     <ID>MaxLineLength:MessagesDatabase.kt$MessagesDatabase.Companion.&lt;no name provided&gt;$"SELECT thread_id, snippet, date, read, title, photo_uri, is_group_conversation, phone_number FROM conversations"</ID>
     <ID>MaxLineLength:MessagesDatabase.kt$MessagesDatabase.Companion.&lt;no name provided&gt;$execSQL("CREATE TABLE IF NOT EXISTS `attachments` (`id` INTEGER PRIMARY KEY AUTOINCREMENT, `message_id` INTEGER NOT NULL, `uri_string` TEXT NOT NULL, `mimetype` TEXT NOT NULL, `width` INTEGER NOT NULL, `height` INTEGER NOT NULL, `filename` TEXT NOT NULL)")</ID>
@@ -101,9 +264,134 @@
     <ID>MaxLineLength:MessagesWriter.kt$MessagesWriter$val selection = "${Mms.Part.CONTENT_LOCATION} = ? AND ${Mms.Part.CONTENT_TYPE} = ? AND ${Mms.Part.MSG_ID} = ? AND ${Mms.Part.CONTENT_ID} = ?"</ID>
     <ID>MaxLineLength:Messaging.kt$*</ID>
     <ID>MaxLineLength:MessagingUtils.kt$MessagingUtils$context.showErrorToast(e.localizedMessage ?: context.getString(org.fossify.commons.R.string.unknown_error_occurred))</ID>
+    <ID>MaxLineLength:MessengerVerbindung.kt$MessengerVerbindung$(RosenwegNotfall.istNotfall(chat.id, d.priority) || (chat.id == "notfall" &amp;&amp; (d.clear || RosenwegNotfall.istEntwarnung(d.body))))</ID>
+    <ID>MaxLineLength:MessengerVerbindung.kt$MessengerVerbindung$RosenwegNotfall.pruefe(this, chat, dk.copy(body = e.nachricht.body ?: dk.body), speicher.titel(chat), e.absenderName)</ID>
+    <ID>MaxLineLength:MessengerVerbindung.kt$MessengerVerbindung$RwKrypto.verschluessele(m.plain ?: return@mapNotNull null, mapOf(ziel.deviceId to ziel.pubkey))</ID>
+    <ID>MaxLineLength:MessengerVerbindung.kt$MessengerVerbindung$baueAusgehendDm(ich, m.clientMsgId ?: continue, m.ts, RwKrypto.verschluessele(m.plain ?: m.body, ziele), m.replyTo)</ID>
+    <ID>MaxLineLength:MessengerVerbindung.kt$MessengerVerbindung$c</ID>
+    <ID>MaxLineLength:MessengerVerbindung.kt$MessengerVerbindung$geplant = arbeiter.schedule({ if (!verbunden &amp;&amp; !verbindetGerade) verbinde() }, zurueck.restMs() + 50, TimeUnit.MILLISECONDS)</ID>
+    <ID>MaxLineLength:MessengerVerbindung.kt$MessengerVerbindung.Companion$ContextCompat.startForegroundService(app, Intent(app, MessengerVerbindung::class.java).setAction(AKTION_SENDEN))</ID>
     <ID>MaxLineLength:MmsPart.kt$MmsPart$return !(text != null || contentType.lowercase().startsWith("text") || contentType.lowercase() == "application/smil")</ID>
+    <ID>MaxLineLength:MqttCodec.kt$MqttCodec$MqttPaket.Publish(topic, rumpf.copyOfRange(pos, rumpf.size), qos, flags and 1 == 1, flags and 8 == 8, pid)</ID>
+    <ID>MaxLineLength:MqttCodec.kt$MqttCodec$fun</ID>
+    <ID>MaxLineLength:MqttCodec.kt$MqttCodec$fun pubAck(packetId: Int): ByteArray</ID>
     <ID>MaxLineLength:NewConversationActivity.kt$NewConversationActivity$// READ_CONTACTS permission is not mandatory, but without it we won't be able to show any suggestions during typing</ID>
+    <ID>MaxLineLength:NotfallActivity.kt$NotfallActivity$window.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON)</ID>
+    <ID>MaxLineLength:NotfallActivity.kt$NotfallActivity$}</ID>
     <ID>MaxLineLength:RecycleBinConversationsAdapter.kt$RecycleBinConversationsAdapter$val conversationsToRemove = currentList.filter { selectedKeys.contains(it.hashCode()) } as ArrayList&lt;Conversation&gt;</ID>
+    <ID>MaxLineLength:RosenwegAbmeldung.kt$RosenwegAbmeldung$ks.aliases().toList().filter { it.startsWith("rw_dm_") || it == RosenwegPrivatAnmeldung.ALIAS }.forEach { ks.deleteEntry(it) }</ID>
+    <ID>MaxLineLength:RosenwegAbmeldung.kt$RosenwegLoeschProvider$if</ID>
+    <ID>MaxLineLength:RosenwegApi.kt$RosenwegApi$anfrage("POST", "/api/conversations/${enc(chatId)}/members/${enc(userId)}/role", buildJsonObject { put("role", rolle) }.toString())</ID>
+    <ID>MaxLineLength:RosenwegApi.kt$RosenwegApi$anfrage("POST", "/api/link/backfill", """{"targetDeviceId":${kotlinx.serialization.json.JsonPrimitive(zielGeraet)},"entries":$entriesJson}""")</ID>
+    <ID>MaxLineLength:RosenwegApi.kt$RosenwegApi$anfrage("POST", "/api/messages/${enc(chatId)}/delete", buildJsonObject { put("clientMsgId", clientMsgId) }.toString())</ID>
+    <ID>MaxLineLength:RosenwegApi.kt$RosenwegApi$fun</ID>
+    <ID>MaxLineLength:RosenwegApi.kt$RosenwegApi$fun mitglieder(chatId: String): List&lt;String&gt;</ID>
+    <ID>MaxLineLength:RosenwegApi.kt$RosenwegApi$put("memberIds", kotlinx.serialization.json.JsonArray(listOf(kotlinx.serialization.json.JsonPrimitive(dmMit))))</ID>
+    <ID>MaxLineLength:RosenwegApi.kt$RosenwegApi$put("memberIds", kotlinx.serialization.json.JsonArray(mitglieder.map { kotlinx.serialization.json.JsonPrimitive(it) }))</ID>
+    <ID>MaxLineLength:RosenwegApi.kt$RosenwegApi$put("userIds", kotlinx.serialization.json.JsonArray(userIds.map { kotlinx.serialization.json.JsonPrimitive(it) }))</ID>
+    <ID>MaxLineLength:RosenwegApi.kt$RosenwegApi$return</ID>
+    <ID>MaxLineLength:RosenwegApi.kt$RosenwegApi$return MqttZugang(token, o.lng("expiresIn") ?: 3600L, leseJwt(token), o.str("mqttUsername")?.takeIf { it.startsWith("msg-") })</ID>
+    <ID>MaxLineLength:RosenwegApi.kt$RosenwegApi$val o = parseJson(anfrage("GET", "/api/conversations/${enc(chatId)}/members")) as? JsonObject ?: return emptyList()</ID>
+    <ID>MaxLineLength:RosenwegApi.kt$RosenwegApi$val o = parseJson(anfrage("POST", "/api/conversations", body)) as? JsonObject ?: throw IOException("keine Antwort")</ID>
+    <ID>MaxLineLength:RosenwegApi.kt$RosenwegApi$val rumpf = body?.toRequestBody(JSON) ?: if (methode == "GET" || methode == "DELETE") null else ByteArray(0).toRequestBody(JSON)</ID>
+    <ID>MaxLineLength:RosenwegApi.kt$RosenwegApi.MqttZugang$data</ID>
+    <ID>MaxLineLength:RosenwegDatenbank.kt$RosenwegDao$@Query("SELECT * FROM rwmessage WHERE chat_id = :chatId AND ciphertext IS NOT NULL AND body IS NULL AND deleted = 0")</ID>
+    <ID>MaxLineLength:RosenwegDatenbank.kt$RosenwegDao$@Query("SELECT * FROM rwmessage WHERE rcpt_soll &gt; rcpt_gesendet AND client_msg_id IS NOT NULL ORDER BY ts LIMIT 500")</ID>
+    <ID>MaxLineLength:RosenwegDatenbank.kt$RosenwegDao$@Query("UPDATE rwmessage SET rcpt_soll = 2 WHERE chat_id = :chatId AND sender_id != :ich AND client_msg_id IS NOT NULL AND rcpt_soll &lt; 2 AND (:clientMsgId IS NULL OR client_msg_id = :clientMsgId)")</ID>
+    <ID>MaxLineLength:RosenwegDatenbank.kt$RosenwegDao$@Query("UPDATE rwmessage SET rcpt_soll = 2 WHERE chat_id = :chatId AND sender_id != :ich AND client_msg_id IS NOT NULL AND rcpt_soll &lt; 2 AND (priority IS NULL OR priority != 'emergency')")</ID>
+    <ID>MaxLineLength:RosenwegDatenbank.kt$RosenwegDao$@Query("UPDATE rwmessage SET read = 1 WHERE chat_id = :chatId AND read = 0 AND server_id IS NOT NULL AND server_id &lt;= :bis")</ID>
+    <ID>MaxLineLength:RosenwegDatenbank.kt$RosenwegDatenbank$@Database(entities = [RwChat::class, RwMessage::class, RwUser::class, RwBackfill::class], version = 5, exportSchema = true)</ID>
+    <ID>MaxLineLength:RosenwegDatenbank.kt$RosenwegDatenbank.Companion$instanz</ID>
+    <ID>MaxLineLength:RosenwegDatenbank.kt$RosenwegDatenbank.Companion.&lt;no name provided&gt;$"CREATE TABLE IF NOT EXISTS `backfill` (`conv_id` TEXT NOT NULL, `orig_msg_id` INTEGER NOT NULL, "</ID>
+    <ID>MaxLineLength:RosenwegGruppeActivity.kt$RosenwegGruppeActivity$.</ID>
+    <ID>MaxLineLength:RosenwegGruppeActivity.kt$RosenwegGruppeActivity$aktion</ID>
+    <ID>MaxLineLength:RosenwegGruppeActivity.kt$RosenwegGruppeActivity$aktion("Mitglieder konnten nicht hinzugefügt werden.") { a, c -&gt; a.mitgliederHinzufuegen(c.id, ids) }</ID>
+    <ID>MaxLineLength:RosenwegGruppeActivity.kt$RosenwegGruppeActivity$private</ID>
+    <ID>MaxLineLength:RosenwegGruppeActivity.kt$RosenwegGruppeActivity$val</ID>
+    <ID>MaxLineLength:RosenwegGruppeActivity.kt$RosenwegGruppeActivity$val bild = if (c.kind == "dm") speicher.dmPartner(c)?.let { speicher.personenBildFuer(it) } ?: "" else speicher.gespraechsBild(c)</ID>
+    <ID>MaxLineLength:RosenwegGruppeActivity.kt$RosenwegGruppeActivity$z.mitgliedRolle.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, ROLLEN.map { it.second })</ID>
+    <ID>MaxLineLength:RosenwegHooks.kt$RosenwegHooks$fun</ID>
+    <ID>MaxLineLength:RosenwegHooks.kt$RosenwegHooks$fun rohText(context: Context, mirrorId: Long): String?</ID>
+    <ID>MaxLineLength:RosenwegHooks.kt$RosenwegHooks$private val gelesenGeplant = java.util.concurrent.ConcurrentHashMap&lt;String, java.util.concurrent.ScheduledFuture&lt;*&gt;&gt;()</ID>
+    <ID>MaxLineLength:RosenwegHooks.kt$RosenwegHooks$return if (schreibend.size == 1) "${s.name(schreibend[0])} schreibt …" else "${schreibend.size} Personen schreiben …"</ID>
+    <ID>MaxLineLength:RosenwegHooks.kt$RosenwegHooks$speicher.neueAusgehende(chat, text, antwortAuf = antwortAuf?.let { speicher.nachrichtZuSpiegel(it) }, medien = b)</ID>
+    <ID>MaxLineLength:RosenwegHooks.kt$RosenwegHooks$val</ID>
+    <ID>MaxLineLength:RosenwegHooks.kt$RosenwegHooks$val datum = if (heute) "heute" else java.text.DateFormat.getDateInstance(java.text.DateFormat.SHORT).format(java.util.Date(p.ts))</ID>
+    <ID>MaxLineLength:RosenwegHooks.kt$RosenwegHooks$val frisch = RosenwegApi(konto).verlauf(m.chatId, sid - 1, 1).firstOrNull { it.clientMsgId == m.clientMsgId }</ID>
+    <ID>MaxLineLength:RosenwegKonto.kt$RosenwegKonto.Companion$RosenwegKonto(t.server, t.token, (if (t.gueltigBisSek &gt; 0) t.gueltigBisSek else (jwt.exp ?: 0L)) * 1000, sub, jwt.name, ERNEUERN_VOR_PRIVAT_MS)</ID>
+    <ID>MaxLineLength:RosenwegLive.kt$RosenwegLive$val uid = topic.removePrefix("presence/").takeIf { it.isNotEmpty() &amp;&amp; !it.contains('/') }?.let { normiereId(it) } ?: return</ID>
+    <ID>MaxLineLength:RosenwegNeuerChat.kt$RosenwegNeuerChat$.</ID>
+    <ID>MaxLineLength:RosenwegNeuerChat.kt$RosenwegNeuerChat$if (liste.isEmpty()) a.toast("Verzeichnis noch nicht geladen – bitte gleich nochmals versuchen") else weiter(liste)</ID>
+    <ID>MaxLineLength:RosenwegNotfall.kt$RosenwegNotfall$Intent(app, NotfallActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)</ID>
+    <ID>MaxLineLength:RosenwegNotfall.kt$RosenwegNotfall$OffenerAlarm</ID>
+    <ID>MaxLineLength:RosenwegNotfall.kt$RosenwegNotfall$android.os.PowerManager.FULL_WAKE_LOCK or android.os.PowerManager.ACQUIRE_CAUSES_WAKEUP or android.os.PowerManager.ON_AFTER_RELEASE</ID>
+    <ID>MaxLineLength:RosenwegNotfall.kt$RosenwegNotfall$app.startActivity(Intent(app, NotfallActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP))</ID>
+    <ID>MaxLineLength:RosenwegNotfall.kt$RosenwegNotfall$merke(context, OffenerAlarm(chat.id, d.clientMsgId, titel, absender, d.body ?: "", System.currentTimeMillis()))</ID>
+    <ID>MaxLineLength:RosenwegNotfall.kt$RosenwegNotfall$nm</ID>
+    <ID>MaxLineLength:RosenwegNotfall.kt$RosenwegNotfall$nm.createNotificationChannel(NotificationChannel(KANAL_KRISE, "Rosenweg Krisenmodus", NotificationManager.IMPORTANCE_HIGH))</ID>
+    <ID>MaxLineLength:RosenwegNotfall.kt$RosenwegNotfall$private val STOPP = setOf("stop", "stopp", "entwarnung", "entwarnt", "ende", "vorbei", "aufgehoben", "alles ok", "alles gut")</ID>
+    <ID>MaxLineLength:RosenwegNotfall.kt$RosenwegNotfall$return</ID>
+    <ID>MaxLineLength:RosenwegNotfall.kt$RosenwegNotfall$val gelesen = a.clientMsgId?.let { RosenwegSpeicher.get(app).nachricht(a.chatId, it) }?.let { it.rcptSoll &gt;= RwQuittung.GELESEN } == true</ID>
+    <ID>MaxLineLength:RosenwegNotfall.kt$RosenwegNotfall.Sirene$.</ID>
+    <ID>MaxLineLength:RosenwegNotfall.kt$RosenwegNotfall.Sirene$daten[teil * dauer + i] = (sin(2 * PI * f * i / rate) * huelle * 0.5 * Short.MAX_VALUE).toInt().toShort()</ID>
+    <ID>MaxLineLength:RosenwegNotfall.kt$RosenwegNotfall.Sirene$if (alterFilter &gt; 0) context.getSystemService(NotificationManager::class.java).setInterruptionFilter(alterFilter)</ID>
+    <ID>MaxLineLength:RosenwegPrivatAnmeldung.kt$RosenwegPrivatAnmeldung$fun</ID>
+    <ID>MaxLineLength:RosenwegPrivatAnmeldung.kt$RosenwegPrivatAnmeldung$post("/api/messenger/zugang/abmelden", JSONObject().put("zugang", alterZugang.first).put("geheimnis", alterZugang.second), null)</ID>
+    <ID>MaxLineLength:RosenwegPrivatAnmeldung.kt$RosenwegPrivatAnmeldung$return Base64.encodeToString(c.iv, Base64.NO_WRAP) + ":" + Base64.encodeToString(c.doFinal(s.toByteArray()), Base64.NO_WRAP)</ID>
+    <ID>MaxLineLength:RosenwegPrivatAnmeldung.kt$RosenwegPrivatAnmeldung$throw Fehler(j.optString("error").ifEmpty { if (status == 401) "Anmeldung abgelaufen, bitte nochmals" else "Rosenweg nicht erreichbar ($status)" })</ID>
+    <ID>MaxLineLength:RosenwegPrivatAnmeldung.kt$RosenwegPrivatAnmeldung$val (status, _) = post("/api/messenger/zugang/abmelden", JSONObject().put("zugang", zugang).put("geheimnis", geheimnis), null)</ID>
+    <ID>MaxLineLength:RosenwegPrivatAnmeldung.kt$RosenwegPrivatAnmeldung$val (status, j) = post("/api/messenger/zugang/token", JSONObject().put("zugang", zugang).put("geheimnis", geheimnis), null)</ID>
+    <ID>MaxLineLength:RosenwegProtokoll.kt$.</ID>
+    <ID>MaxLineLength:RosenwegProtokoll.kt$RwBackfillEintrag(b.str("convId") ?: return@mapNotNull null, b.lng("origMsgId") ?: return@mapNotNull null, buendel)</ID>
+    <ID>MaxLineLength:RosenwegProtokoll.kt$RwGeraet(d.str("deviceId") ?: return@mapNotNull null, d.str("pubkey") ?: return@mapNotNull null, parseZeit(d["lastSeen"]), parseZeit(d["addedAt"]))</ID>
+    <ID>MaxLineLength:RosenwegProtokoll.kt$RwGeraet(k.str("device_id") ?: return@mapNotNull null, k.str("pubkey") ?: return@mapNotNull null, parseZeit(k["last_seen"]), parseZeit(k["added_at"]))</ID>
+    <ID>MaxLineLength:RosenwegProtokoll.kt$RwSteuerung$Reaktion : RwSteuerung</ID>
+    <ID>MaxLineLength:RosenwegProtokoll.kt$ciphertext = ct?.takeIf { it !is JsonNull }?.let { if (it is JsonPrimitive) it.contentOrNull else it.toString() }</ID>
+    <ID>MaxLineLength:RosenwegProtokoll.kt$fun</ID>
+    <ID>MaxLineLength:RosenwegProtokoll.kt$if (!replyPreview.isNullOrBlank()) sb.append(RW_ZITAT_MARKE).append(replyPreview.replace('\n', ' ').take(90)).append('\n')</ID>
+    <ID>MaxLineLength:RosenwegProtokoll.kt$participants = meta?.arr("participants")?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull?.let { p -&gt; normiereId(p) } } ?: emptyList()</ID>
+    <ID>MaxLineLength:RosenwegProtokoll.kt$reactions[emoji] = ro.arr("users")?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull?.let { u -&gt; normiereId(u) } } ?: emptyList()</ID>
+    <ID>MaxLineLength:RosenwegProtokoll.kt$return</ID>
+    <ID>MaxLineLength:RosenwegProtokoll.kt$return if (d != null &amp;&amp; !t.contains('e', true) &amp;&amp; d == Math.floor(d) &amp;&amp; t.contains('.')) d.toLong().toString() else t</ID>
+    <ID>MaxLineLength:RosenwegProtokoll.kt$return o.arr("members")?.mapNotNull { (it as? JsonObject)?.str("userId")?.let { u -&gt; normiereId(u) } } ?: emptyList()</ID>
+    <ID>MaxLineLength:RosenwegProtokollTest.kt$RosenwegProtokollTest$assertEquals(RwQuittung.ZUGESTELLT, RwQuittung.parse("receipt/g1/7", """{"msgId":"c","state":"delivered"}""")!!.stufe)</ID>
+    <ID>MaxLineLength:RosenwegProtokollTest.kt$RosenwegProtokollTest$assertEquals(RwSteuerung.Bearbeiten("c", "neu", 1732440000123), parseSteuerung("""{"type":"edit","clientMsgId":"c","body":"neu","editedAt":1732440000123}"""))</ID>
+    <ID>MaxLineLength:RosenwegProtokollTest.kt$RosenwegProtokollTest$parseVerzeichnis("""{"users":[{"id":3,"name":"Anna","avatar":"data:image/png;base64,AA=="},{"id":"4","email":"b@x.ch","avatar":null}]}""")</ID>
+    <ID>MaxLineLength:RosenwegProtokollTest.kt$RosenwegProtokollTest$val a = leseJwt(jwt("""{"sub":42,"name":"Stefan","exp":1732440000,"pub_topics":["group/g1","presence/42"]}"""))!!</ID>
+    <ID>MaxLineLength:RosenwegProtokollTest.kt$RosenwegProtokollTest$val d = parseLiveNachricht("dm/dm-1/msg/3", """{"clientMsgId":"c","ts":1,"ciphertext":{"v":1,"alg":"ecdh-p256-aesgcm-v1"}}""")!!</ID>
+    <ID>MaxLineLength:RosenwegProtokollTest.kt$RosenwegProtokollTest$val mitLogo = parseGespraeche("""{"conversations":[{"id":"technik","kind":"group","title":"Technik","topic_prefix":"group/technik","metadata":{"avatar":"data:image/png;base64,AA=="}}]}""")</ID>
+    <ID>MaxLineLength:RosenwegSmsModus.kt$RosenwegSmsModus$if (geaendert &gt; 0) Log.i(TAG, "Modus $m: $geaendert SMS-Bausteine ${if (soll == PackageManager.COMPONENT_ENABLED_STATE_DISABLED) "aus" else "an"}")</ID>
+    <ID>MaxLineLength:RosenwegSmsModusTest.kt$RosenwegSmsModusTest$halter.forEach { assertTrue("$it haelt SMS-Rolle, ist aber nicht in SMS_BAUSTEINE", it in RosenwegSmsModus.SMS_BAUSTEINE) }</ID>
+    <ID>MaxLineLength:RosenwegSmsModusTest.kt$RosenwegSmsModusTest$val f = listOf("src/main/AndroidManifest.xml", "app/src/main/AndroidManifest.xml").map(::File).first { it.exists() }</ID>
+    <ID>MaxLineLength:RosenwegSpeicher.kt$RosenwegSpeicher$(text?.let { parseJson(it) } as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }?.toSet() ?: emptySet()</ID>
+    <ID>MaxLineLength:RosenwegSpeicher.kt$RosenwegSpeicher$Eingang</ID>
+    <ID>MaxLineLength:RosenwegSpeicher.kt$RosenwegSpeicher$Log.i(TAG, "Spiegel-Pruefung: ${app.messagesDB.countRosenwegMirror()} Rosenweg-Zeilen im Fossify-Cache vor dem Neuschreiben")</ID>
+    <ID>MaxLineLength:RosenwegSpeicher.kt$RosenwegSpeicher$Log.w(TAG, "Spiegel unvollstaendig: chat=${chat.id} thread=$threadId speicher=${alle.size} spiegel=${gespiegelt.size} - ergaenze ${fehlend.size}")</ID>
+    <ID>MaxLineLength:RosenwegSpeicher.kt$RosenwegSpeicher$dao.nachrichten(chatId).any { it.priority == "emergency" &amp;&amp; it.senderId != eigeneId &amp;&amp; it.rcptSoll &lt; RwQuittung.GELESEN &amp;&amp; !it.deleted }</ID>
+    <ID>MaxLineLength:RosenwegSpeicher.kt$RosenwegSpeicher$fun</ID>
+    <ID>MaxLineLength:RosenwegSpeicher.kt$RosenwegSpeicher$mediaName = if (alsAnhang) null else m.mediaName?.let { if (m.media != null &amp;&amp; !m.deleted) "$it (wird geladen …)" else it }</ID>
+    <ID>MaxLineLength:RosenwegSpeicher.kt$RosenwegSpeicher$rcptGesendet = if (!eigen &amp;&amp; gelesen &amp;&amp; d.ts &lt; System.currentTimeMillis() - QUITTUNG_ERSTIMPORT_MS) 2 else 0</ID>
+    <ID>MaxLineLength:RosenwegSpeicher.kt$RosenwegSpeicher$reactions = reaktionenZuJson(wendeReaktionAn(reaktionenAusJson(alt.reactions), s.userId, s.emoji, s.entfernen))</ID>
+    <ID>MaxLineLength:RosenwegSpeicher.kt$RosenwegSpeicher$replyTo = antwortAuf?.clientMsgId?.let { baueReplyTo(it, antwortAuf.senderId, vorschau(antwortAuf), chat.kind == "dm") }</ID>
+    <ID>MaxLineLength:RosenwegSpeicher.kt$RosenwegSpeicher$status = if (alt.status == RwStatus.AUSSTEHEND || alt.status == RwStatus.FEHLER) RwStatus.GESENDET else alt.status</ID>
+    <ID>MaxLineLength:RosenwegSpeicher.kt$RosenwegSpeicher$val</ID>
+    <ID>MaxLineLength:RosenwegSpeicher.kt$RosenwegSpeicher$val rolleErlaubt = if (g.kind == "bcast") g.role == "publisher" || g.role == "admin" || istAdmin else g.role != "readonly"</ID>
+    <ID>MaxLineLength:RwGeraeteSchluessel.kt$RwGeraeteSchluessel.Companion$return "dev_${h.substring(0, 8)}-${h.substring(8, 12)}-${h.substring(12, 16)}-${h.substring(16, 20)}-${h.substring(20, 32)}"</ID>
+    <ID>MaxLineLength:RwGeraeteSchluessel.kt$RwGeraeteSchluessel.Companion$return RwGeraeteSchluessel(id, kp.private, true, RwKrypto.b64(RwKrypto.roh(kp.public as ECPublicKey)))</ID>
+    <ID>MaxLineLength:RwGeraeteSchluessel.kt$RwGeraeteSchluessel.Companion$val kp = KeyPairGenerator.getInstance("EC").apply { initialize(ECGenParameterSpec("secp256r1")) }.generateKeyPair()</ID>
+    <ID>MaxLineLength:RwKrypto.kt$RwKrypto$c.init(if (verschluesseln) Cipher.ENCRYPT_MODE else Cipher.DECRYPT_MODE, SecretKeySpec(schluessel, "AES"), GCMParameterSpec(128, iv))</ID>
+    <ID>MaxLineLength:RwKryptoTest.kt$GeraeteIdTest$org.junit.Assert.assertTrue(a, Regex("^dev_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$").matches(a))</ID>
+    <ID>MaxLineLength:RwKryptoTest.kt$InboxTest$org.junit.Assert.assertEquals(RwInbox.Gelesen("dm-1", 42), parseInbox("""{"type":"read","convId":"dm-1","lastReadMsgId":42,"ts":1}"""))</ID>
+    <ID>MaxLineLength:RwKryptoTest.kt$InboxTest$org.junit.Assert.assertEquals(RwInbox.Gespraeche, parseInbox("""{"type":"conversations","action":"added","convId":"g"}"""))</ID>
+    <ID>MaxLineLength:RwKryptoTest.kt$InboxTest$val g = parseGespraeche("""{"conversations":[{"id":"g","kind":"group","topic_prefix":"group/g","unread":3,"last_read_msg_id":"17"}]}""")</ID>
+    <ID>MaxLineLength:RwKryptoTest.kt$RwKryptoTest$private</ID>
+    <ID>MaxLineLength:RwKryptoTest.kt$RwKryptoTest$private val buendel = """{"v":1,"alg":"ecdh-p256-aesgcm-v1","epk":"BFREJVxP+M5Q0dZEEUDZxTfJQ/b3b5G2vpW7my5EXgoFt5JQQHxdsHZNKm+L+T46DvnoDSVtyEG1JV9ChtTdlrk=","perDevice":{"dev_test-1":{"iv":"z7AT94VRHlCQJwFT","ct":"XBnlGFVokOqexIDRqH3beQG0HJetHzatZlhx0piz/S8QINbh9GaEpg=="}}}"""</ID>
+    <ID>MaxLineLength:RwMqttClient.kt$RwMqttClient$fun</ID>
+    <ID>MaxLineLength:RwMqttClient.kt$RwMqttClient.&lt;no name provided&gt;$MqttCodec.connect(opt.clientId, opt.username, opt.password, opt.keepAliveSek, true, opt.will).toByteString()</ID>
+    <ID>MaxLineLength:RwZitat.kt$RwZitat$sb.setSpan(ForegroundColorSpan(ColorUtils.setAlphaComponent(textFarbe, 0xC0)), ts, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)</ID>
+    <ID>MaxLineLength:RwZitat.kt$RwZitat$val kasten = ColorUtils.setAlphaComponent(if (ColorUtils.calculateLuminance(textFarbe) &gt; 0.5) 0xFFFFFFFF.toInt() else 0xFF000000.toInt(), 0x22)</ID>
+    <ID>MaxLineLength:RwZurueckhalten.kt$RwZurueckhalten.Companion$speichern = { s -&gt; p.edit().putInt("fehler", s.fehler).putLong("nicht_vor", s.nichtVorMs).putString("art", s.art.name).apply() }</ID>
+    <ID>MaxLineLength:RwZurueckhalten.kt$RwZurueckhalten.Companion$val basis = if (bisherigeFehler &gt;= 16) HOECHSTENS_MS else (ERSTE_MS shl bisherigeFehler.coerceAtLeast(0)).coerceAtMost(HOECHSTENS_MS)</ID>
     <ID>MaxLineLength:SearchResult.kt$SearchResult</ID>
     <ID>MaxLineLength:SearchResultsAdapter.kt$SearchResultsAdapter$SimpleContactsHelper(activity).loadContactImage(searchResult.photoUri, searchResultImage, searchResult.title)</ID>
     <ID>MaxLineLength:SearchResultsAdapter.kt$SearchResultsAdapter$activity: SimpleActivity</ID>
@@ -114,6 +402,7 @@
     <ID>MaxLineLength:ThreadActivity.kt$ThreadActivity$if</ID>
     <ID>MaxLineLength:ThreadActivity.kt$ThreadActivity$privateContacts.firstOrNull { it.doesHavePhoneNumber(participant.phoneNumbers.first().normalizedNumber) }</ID>
     <ID>MaxLineLength:ThreadAdapter.kt$ThreadAdapter$// not sure how we can get UnknownFormatConversionException here, so show the error and hope that someone reports it</ID>
+    <ID>MaxLineLength:ThreadAdapter.kt$ThreadAdapter$if</ID>
     <ID>MaxLineLength:ThreadAdapter.kt$ThreadAdapter$mimetype.isImageMimeType() || mimetype.isVideoMimeType() -&gt; setupImageView(holder, binding = this, message, attachment)</ID>
     <ID>MaxLineLength:ThreadAdapter.kt$ThreadAdapter$mimetype.isVCardMimeType() -&gt; setupVCardView(holder, threadMessageAttachmentsHolder, message, attachment)</ID>
     <ID>MaxLineLength:ThreadAdapter.kt$ThreadAdapter$private</ID>
@@ -132,6 +421,13 @@
     <ID>NestedBlockDepth:Messaging.kt$fun Context.sendMessageCompat( text: String, addresses: List&lt;String&gt;, subId: Int?, attachments: List&lt;Attachment&gt;, messageId: Long? = null )</ID>
     <ID>NestedBlockDepth:MessagingUtils.kt$MessagingUtils$@Deprecated("TODO: Move/rewrite MMS code into the app.") fun sendMmsMessage( text: String, addresses: List&lt;String&gt;, attachment: Attachment?, settings: Settings, messageId: Long? = null )</ID>
     <ID>NestedBlockDepth:MessagingUtils.kt$MessagingUtils$fun updateSmsMessageSendingStatus(messageUri: Uri?, type: Int)</ID>
+    <ID>NestedBlockDepth:MessengerVerbindung.kt$MessengerVerbindung$private fun eingang(topic: String, text: String)</ID>
+    <ID>NestedBlockDepth:MessengerVerbindung.kt$MessengerVerbindung$private fun holeVerlauf()</ID>
+    <ID>NestedBlockDepth:MessengerVerbindung.kt$MessengerVerbindung$private fun schiebeBackfill()</ID>
+    <ID>NestedBlockDepth:MessengerVerbindung.kt$MessengerVerbindung$private fun sendeAusstehendeJetzt()</ID>
+    <ID>NestedBlockDepth:MessengerVerbindung.kt$MessengerVerbindung$private fun verbinde()</ID>
+    <ID>NestedBlockDepth:RosenwegAvatare.kt$RosenwegAvatare$private fun logo(slug: String): String</ID>
+    <ID>NestedBlockDepth:RosenwegMedien.kt$RosenwegMedien$fun lese(context: Context, uri: Uri, mime: String, name: String?): Auswahl</ID>
     <ID>NestedBlockDepth:SmsStatusDeliveredReceiver.kt$SmsStatusDeliveredReceiver$override fun updateAndroidDatabase(context: Context, intent: Intent, receiverResultCode: Int)</ID>
     <ID>NestedBlockDepth:ThreadActivity.kt$ThreadActivity$private fun setupButtons()</ID>
     <ID>NestedBlockDepth:ThreadAdapter.kt$ThreadAdapter$private fun setupSentMessageView(messageBinding: ItemMessageBinding, message: Message)</ID>
@@ -140,8 +436,12 @@
     <ID>PrintStackTrace:ScheduledMessageReceiver.kt$ScheduledMessageReceiver$e</ID>
     <ID>PrintStackTrace:SmsManager.kt$e</ID>
     <ID>ReturnCount:MapDeserializerDoubleAsIntFix.kt$MapDeserializerDoubleAsIntFix$fun read(element: JsonElement): Any?</ID>
+    <ID>ReturnCount:RosenwegHooks.kt$RosenwegHooks$fun untertitel(context: Context, threadId: Long): String?</ID>
+    <ID>ReturnCount:RosenwegProtokoll.kt$RwQuittung$fun parse(topic: String, payload: String): Eingang?</ID>
+    <ID>ReturnCount:RosenwegProtokoll.kt$fun parseSteuerung(payload: String, jetztMs: Long = System.currentTimeMillis()): RwSteuerung?</ID>
     <ID>SpreadOperator:Context.kt$(*scheduledMessages)</ID>
     <ID>SpreadOperator:MainActivity.kt$MainActivity$(*currentMessages.toTypedArray())</ID>
+    <ID>SpreadOperator:RosenwegDatenbank.kt$RosenwegDatenbank.Companion$(*MIGRATIONEN)</ID>
     <ID>SpreadOperator:ThreadActivity.kt$ThreadActivity$(*currentMessages.toTypedArray())</ID>
     <ID>SwallowedException:ArchivedConversationsActivity.kt$ArchivedConversationsActivity$e: Exception</ID>
     <ID>SwallowedException:BlockedKeywordsExporter.kt$BlockedKeywordsExporter$e: Exception</ID>
@@ -152,6 +452,11 @@
     <ID>SwallowedException:MmsReceiver.kt$MmsReceiver$e: Exception</ID>
     <ID>SwallowedException:NewConversationActivity.kt$NewConversationActivity$e: Exception</ID>
     <ID>SwallowedException:RecycleBinConversationsActivity.kt$RecycleBinConversationsActivity$e: Exception</ID>
+    <ID>SwallowedException:RosenwegKonto.kt$RosenwegKonto.Companion$e: RosenwegPrivatAnmeldung.Abgelehnt</ID>
+    <ID>SwallowedException:RosenwegKonto.kt$RosenwegKonto.Companion$e: RosenwegPrivatAnmeldung.Widerrufen</ID>
+    <ID>SwallowedException:RosenwegPrivatAnmeldung.kt$RosenwegPrivatAnmeldung$e: Exception</ID>
+    <ID>SwallowedException:RosenwegSmsModus.kt$RosenwegSmsModus$e: Exception</ID>
+    <ID>SwallowedException:RosenwegSpeicher.kt$RosenwegSpeicher$e: Exception</ID>
     <ID>SwallowedException:SimpleContact.kt$e: Exception</ID>
     <ID>SwallowedException:SmsIntentParser.kt$SmsIntentParser$e: UnsupportedEncodingException</ID>
     <ID>SwallowedException:SmsStatusDeliveredReceiver.kt$SmsStatusDeliveredReceiver$e: NullPointerException</ID>
@@ -160,6 +465,10 @@
     <ID>SwallowedException:VCardParser.kt$e: Exception</ID>
     <ID>ThrowingExceptionsWithoutMessageOrCause:AttachmentUtils.kt$AttachmentUtils$IllegalStateException()</ID>
     <ID>ThrowingExceptionsWithoutMessageOrCause:MessagesImporter.kt$MessagesImporter$IllegalStateException()</ID>
+    <ID>ThrowsCount:RosenwegApi.kt$RosenwegApi$fun medienHochladen(chatId: String, daten: ByteArray, filename: String, mime: String, verschluesselt: Boolean): String</ID>
+    <ID>ThrowsCount:RosenwegApi.kt$RosenwegApi$fun neuesGespraech(dmMit: String?, gruppenTitel: String?, mitglieder: List&lt;String&gt;): RwGespraechDaten</ID>
+    <ID>ThrowsCount:RosenwegHooks.kt$RosenwegHooks$fun aktion(context: Context, mirrorId: Long, fehlerText: String, block: (RosenwegApi, RwChat, String) -&gt; Unit)</ID>
+    <ID>ThrowsCount:RosenwegPrivatAnmeldung.kt$RosenwegPrivatAnmeldung$fun messengerToken(c: Context): Token?</ID>
     <ID>ThrowsCount:SmsSender.kt$SmsSender$fun sendMessage( subId: Int, destination: String, body: String, serviceCenter: String?, requireDeliveryReport: Boolean, messageUri: Uri )</ID>
     <ID>TooGenericExceptionCaught:Activity.kt$e: Exception</ID>
     <ID>TooGenericExceptionCaught:ArchivedConversationsActivity.kt$ArchivedConversationsActivity$e: Exception</ID>
@@ -177,9 +486,26 @@
     <ID>TooGenericExceptionCaught:Messaging.kt$e: Exception</ID>
     <ID>TooGenericExceptionCaught:MessagingUtils.kt$MessagingUtils$e: Error</ID>
     <ID>TooGenericExceptionCaught:MessagingUtils.kt$MessagingUtils$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:MessengerVerbindung.kt$MessengerVerbindung$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:MessengerVerbindung.kt$MessengerVerbindung$ex: Exception</ID>
+    <ID>TooGenericExceptionCaught:MessengerVerbindung.kt$MessengerVerbindung.Companion$e: Exception</ID>
     <ID>TooGenericExceptionCaught:MmsReceiver.kt$MmsReceiver$e: Exception</ID>
     <ID>TooGenericExceptionCaught:NewConversationActivity.kt$NewConversationActivity$e: Exception</ID>
     <ID>TooGenericExceptionCaught:RecycleBinConversationsActivity.kt$RecycleBinConversationsActivity$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:RosenwegAbmeldung.kt$RosenwegAbmeldung$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:RosenwegAbmeldung.kt$RosenwegAbmeldungReceiver$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:RosenwegAvatare.kt$RosenwegAvatare$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:RosenwegGruppeActivity.kt$RosenwegGruppeActivity$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:RosenwegHooks.kt$RosenwegHooks$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:RosenwegKonto.kt$RosenwegKonto.Companion$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:RosenwegNeuerChat.kt$RosenwegNeuerChat$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:RosenwegNotfall.kt$RosenwegNotfall$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:RosenwegNotfall.kt$RosenwegNotfall.Sirene$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:RosenwegPrivatAnmeldung.kt$RosenwegPrivatAnmeldung$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:RosenwegSmsModus.kt$RosenwegSmsModus$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:RosenwegSpeicher.kt$RosenwegSpeicher$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:RwGeraeteSchluessel.kt$RwGeraeteSchluessel.Companion$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:RwMqttClient.kt$RwMqttClient.&lt;no name provided&gt;$e: Exception</ID>
     <ID>TooGenericExceptionCaught:ScheduledMessageReceiver.kt$ScheduledMessageReceiver$e: Error</ID>
     <ID>TooGenericExceptionCaught:ScheduledMessageReceiver.kt$ScheduledMessageReceiver$e: Exception</ID>
     <ID>TooGenericExceptionCaught:SimpleContact.kt$e: Exception</ID>
@@ -202,17 +528,41 @@
     <ID>TooManyFunctions:ManageBlockedKeywordsAdapter.kt$ManageBlockedKeywordsAdapter : MyRecyclerViewAdapter</ID>
     <ID>TooManyFunctions:MessagesDao.kt$MessagesDao</ID>
     <ID>TooManyFunctions:MessagesWriter.kt$MessagesWriter</ID>
+    <ID>TooManyFunctions:MessengerVerbindung.kt$MessengerVerbindung : Service</ID>
+    <ID>TooManyFunctions:MqttCodec.kt$MqttCodec</ID>
     <ID>TooManyFunctions:RecycleBinConversationsActivity.kt$RecycleBinConversationsActivity : SimpleActivity</ID>
+    <ID>TooManyFunctions:RosenwegApi.kt$RosenwegApi</ID>
+    <ID>TooManyFunctions:RosenwegDatenbank.kt$RosenwegDao</ID>
+    <ID>TooManyFunctions:RosenwegGruppeActivity.kt$RosenwegGruppeActivity : SimpleActivity</ID>
+    <ID>TooManyFunctions:RosenwegHooks.kt$RosenwegHooks</ID>
+    <ID>TooManyFunctions:RosenwegNotfall.kt$RosenwegNotfall</ID>
+    <ID>TooManyFunctions:RosenwegPrivatAnmeldung.kt$RosenwegPrivatAnmeldung</ID>
+    <ID>TooManyFunctions:RosenwegProtokoll.kt$org.fossify.messages.rosenweg.RosenwegProtokoll.kt</ID>
+    <ID>TooManyFunctions:RosenwegSpeicher.kt$RosenwegSpeicher</ID>
+    <ID>TooManyFunctions:RwGeraeteSchluessel.kt$RwGeraeteSchluessel$Companion</ID>
+    <ID>TooManyFunctions:RwKrypto.kt$RwKrypto</ID>
     <ID>TooManyFunctions:SearchResultsAdapter.kt$SearchResultsAdapter : MyRecyclerViewAdapter</ID>
     <ID>TooManyFunctions:SettingsActivity.kt$SettingsActivity : SimpleActivity</ID>
     <ID>TooManyFunctions:ShortcutHelper.kt$ShortcutHelper</ID>
     <ID>TooManyFunctions:ThreadActivity.kt$ThreadActivity : SimpleActivity</ID>
     <ID>TooManyFunctions:ThreadAdapter.kt$ThreadAdapter : MyRecyclerViewListAdapter</ID>
+    <ID>UnusedParameter:MessengerVerbindung.kt$MessengerVerbindung.Companion$context: Context</ID>
+    <ID>UnusedParameter:RosenwegNotfall.kt$RosenwegNotfall$text: String?</ID>
+    <ID>UnusedParameter:RosenwegNotfall.kt$RosenwegNotfall.Sirene$context: Context</ID>
     <ID>UseCheckOrError:AttachmentUtils.kt$AttachmentUtils$throw IllegalStateException()</ID>
     <ID>UseCheckOrError:MessagesImporter.kt$MessagesImporter$throw IllegalStateException()</ID>
+    <ID>UseCheckOrError:RosenwegGruppeActivity.kt$RosenwegGruppeActivity$throw IllegalStateException("nicht angemeldet")</ID>
+    <ID>UseCheckOrError:RosenwegHooks.kt$RosenwegHooks$throw IllegalStateException("Chat fehlt")</ID>
+    <ID>UseCheckOrError:RosenwegHooks.kt$RosenwegHooks$throw IllegalStateException("Nachricht fehlt")</ID>
+    <ID>UseCheckOrError:RosenwegHooks.kt$RosenwegHooks$throw IllegalStateException("Nachricht noch nicht gesendet")</ID>
+    <ID>UseCheckOrError:RosenwegHooks.kt$RosenwegHooks$throw IllegalStateException("nicht angemeldet")</ID>
+    <ID>UseCheckOrError:RosenwegNeuerChat.kt$RosenwegNeuerChat$throw IllegalStateException("nicht angemeldet")</ID>
+    <ID>UseCheckOrError:RwKrypto.kt$RwKrypto$throw IllegalStateException("keine Zielgeraete")</ID>
+    <ID>UseRequire:RosenwegMedien.kt$RosenwegMedien$throw IllegalArgumentException("Datei zu gross (max. 25 MB)")</ID>
     <ID>UseRequire:SmsSender.kt$SmsSender$throw IllegalArgumentException("SmsSender: empty text message")</ID>
     <ID>VariableNaming:MainActivity.kt$MainActivity$private val MAKE_DEFAULT_APP_REQUEST = 1</ID>
     <ID>VariableNaming:MessagesWriter.kt$MessagesWriter$private val INVALID_ID = -1L</ID>
+    <ID>VariableNaming:RosenwegSpeicher.kt$RosenwegSpeicher$/** Quittungen fuer den Erstimport nur fuer juengere Nachrichten senden (keine Flut) */ private val QUITTUNG_ERSTIMPORT_MS = 7L * 24 * 60 * 60 * 1000</ID>
     <ID>WildcardImport:DirectReplyReceiver.kt$import org.fossify.messages.extensions.*</ID>
     <ID>WildcardImport:JsonElement.kt$import com.google.gson.*</ID>
     <ID>WildcardImport:ManageBlockedKeywordsAdapter.kt$import android.view.*</ID>
