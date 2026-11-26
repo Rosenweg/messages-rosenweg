@@ -234,6 +234,7 @@ class ThreadActivity : SimpleActivity() {
 
     /** Rosenweg-Chat (negative Thread-ID): kein SMS, Senden ueber MQTT */
     private val isRosenweg get() = threadId.isRosenwegThread()
+    private var nurMessenger = false
 
     @Volatile
     private var rwFokus = false
@@ -281,6 +282,14 @@ class ThreadActivity : SimpleActivity() {
         }
 
         threadId = intent.getLongExtra(THREAD_ID, 0L)
+        nurMessenger = org.fossify.messages.rosenweg.RosenwegSmsModus.nurMessenger(this)
+        if (nurMessenger && !isRosenweg) {
+            // privat: SMS-Unterhaltungen (z.B. alte Verknuepfung) gibt es hier nicht mehr
+            toast("SMS gibt es auf diesem Telefon in deiner gewohnten SMS-App")
+            startActivity(Intent(this, MainActivity::class.java))
+            finish()
+            return
+        }
         intent.getStringExtra(THREAD_TITLE)?.let {
             binding.threadToolbar.title = it
         }
@@ -880,7 +889,13 @@ class ThreadActivity : SimpleActivity() {
     }
 
     private fun loadConversation() {
-        handlePermission(PERMISSION_READ_PHONE_STATE) { granted ->
+        // privat: Rosenweg-Chats brauchen keine SIM-Angaben -> READ_PHONE_STATE nicht anfragen
+        val mitTelefonStatus: (callback: (Boolean) -> Unit) -> Unit = if (nurMessenger) {
+            { it(true) }
+        } else {
+            { handlePermission(PERMISSION_READ_PHONE_STATE, it) }
+        }
+        mitTelefonStatus { granted ->
             if (granted) {
                 setupButtons()
                 setupConversation()
@@ -1544,8 +1559,10 @@ class ThreadActivity : SimpleActivity() {
 
         val subscriptionIdToSimId = HashMap<Int, String>()
         subscriptionIdToSimId[-1] = "?"
-        subscriptionManagerCompat().activeSubscriptionInfoList?.forEachIndexed { index, subscriptionInfo ->
-            subscriptionIdToSimId[subscriptionInfo.subscriptionId] = "${index + 1}"
+        if (!nurMessenger) {
+            subscriptionManagerCompat().activeSubscriptionInfoList?.forEachIndexed { index, subscriptionInfo ->
+                subscriptionIdToSimId[subscriptionInfo.subscriptionId] = "${index + 1}"
+            }
         }
 
         var prevDateTime = 0

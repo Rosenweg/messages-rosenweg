@@ -57,6 +57,7 @@ import org.fossify.messages.helpers.FILE_SIZE_NONE
 import org.fossify.messages.helpers.MAX_MESSAGE_LENGTH
 import org.fossify.messages.helpers.MESSAGES_LIMIT
 import org.fossify.messages.helpers.MessagingCache
+import org.fossify.messages.rosenweg.RosenwegSmsModus
 import org.fossify.messages.rosenweg.RosenwegHooks
 import org.fossify.messages.rosenweg.isRosenwegThread
 import org.fossify.messages.helpers.NotificationHelper
@@ -863,7 +864,9 @@ fun Context.insertNewSMS(
 fun Context.removeAllArchivedConversations(callback: (() -> Unit)? = null) {
     ensureBackgroundThread {
         try {
+            val nurMessenger = RosenwegSmsModus.nurMessenger(this)
             for (conversation in conversationsDB.getAllArchived()) {
+                if (nurMessenger && !conversation.threadId.isRosenwegThread()) continue
                 deleteConversation(conversation.threadId)
             }
             toast(R.string.archive_emptied_successfully)
@@ -883,6 +886,8 @@ fun Context.deleteConversation(threadId: Long) {
         notificationManager.cancel(threadId.hashCode())
         return
     }
+    // privat (ohne Rosenweg Geraet): SMS gehoeren der gewohnten SMS-App, nie loeschen
+    if (RosenwegSmsModus.nurMessenger(this)) return
     var uri = Sms.CONTENT_URI
     val selection = "${Sms.THREAD_ID} = ?"
     val selectionArgs = arrayOf(threadId.toString())
@@ -1008,6 +1013,7 @@ fun Context.deleteMessage(id: Long, isMMS: Boolean) {
         }
         return
     }
+    if (RosenwegSmsModus.nurMessenger(this)) return
     val uri = if (isMMS) Mms.CONTENT_URI else Sms.CONTENT_URI
     val selection = "${Sms._ID} = ?"
     val selectionArgs = arrayOf(id.toString())

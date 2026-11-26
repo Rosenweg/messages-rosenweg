@@ -119,6 +119,7 @@ class SettingsActivity : SimpleActivity() {
         setupAppPasswordProtection()
         setupMessagesExport()
         setupMessagesImport()
+        if (org.fossify.messages.rosenweg.RosenwegSmsModus.nurMessenger(this)) versteckeSmsEinstellungen()
         updateTextColors(binding.settingsNestedScrollview)
 
         if (
@@ -139,6 +140,28 @@ class SettingsActivity : SimpleActivity() {
         ).forEach {
             it.setTextColor(getProperPrimaryColor())
         }
+    }
+
+    /** privat (ohne Rosenweg Geraet): nur Rosenweg-Chats -> keine Einstellungen, die nur SMS/MMS betreffen */
+    private fun versteckeSmsEinstellungen() = binding.apply {
+        listOf(
+            settingsManageBlockedNumbersHolder,
+            settingsManageBlockedKeywordsHolder,
+            settingsShowCharacterCounterHolder,
+            settingsUseSimpleCharactersHolder,
+            settingsEnableDeliveryReportsHolder,
+            settingsSendLongMessageMmsHolder,
+            settingsSendGroupMessageMmsHolder,
+            settingsMmsFileSizeLimitHolder,
+            settingsRecycleBinLabel,
+            settingsUseRecycleBinHolder,
+            settingsEmptyRecycleBinHolder,
+            settingsRecycleBinDivider,
+            settingsMigratingDivider,
+            settingsMigratingLabel,
+            settingsExportMessagesHolder,
+            settingsImportMessagesHolder,
+        ).forEach { it.beGone() }
     }
 
     private fun setupMessagesExport() {

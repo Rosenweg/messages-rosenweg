@@ -11,6 +11,14 @@
         android:visible="false"
         app:showAsAction="never"
         tools:ignore="HardcodedText" />
+    <!-- nur auf privaten Telefonen, solange der Messenger noch Standard-SMS-App ist -->
+    <item
+        android:id="@+id/rw_standard_sms"
+        android:showAsAction="never"
+        android:title="Gewohnte SMS-App einstellen"
+        android:visible="false"
+        app:showAsAction="never"
+        tools:ignore="HardcodedText" />
     <item
         android:id="@+id/show_recycle_bin"
         android:showAsAction="never"
