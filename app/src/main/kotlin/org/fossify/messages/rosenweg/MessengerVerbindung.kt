@@ -75,7 +75,8 @@ class MessengerVerbindung : Service() {
         fun starteWennKonto(context: Context) {
             val app = context.applicationContext
             ensureBackgroundThread {
-                if (RosenwegKonto.hole(app) != null) {
+                // eigenes Handy: auch ohne Netz starten, der Dienst versucht es dann selbst weiter
+                if (RosenwegKonto.hole(app) != null || RosenwegPrivatAnmeldung.privat(app) && RosenwegPrivatAnmeldung.angemeldet(app)) {
                     try {
                         ContextCompat.startForegroundService(app, Intent(app, MessengerVerbindung::class.java))
                     } catch (e: Exception) {
@@ -318,6 +319,13 @@ class MessengerVerbindung : Service() {
         verbindetGerade = true
         val k = RosenwegKonto.hole(this, erzwingen = kontoNeuHolen)
         kontoNeuHolen = false
+        if (k == null && RosenwegPrivatAnmeldung.privat(this) && RosenwegPrivatAnmeldung.angemeldet(this)) {
+            // eigenes Handy, Zugang noch da, aber Website gerade nicht erreichbar: spaeter nochmals
+            Log.i(TAG, "Messenger-Token nicht erhalten - neuer Versuch spaeter")
+            verbindetGerade = false
+            planeNeuversuch()
+            return
+        }
         if (k == null) {
             Log.i(TAG, "kein Messenger-Zugang mehr - Dienst endet")
             verbindetGerade = false
@@ -432,7 +440,9 @@ class MessengerVerbindung : Service() {
                 clientId = "and_$deviceId",
                 // Stefan 25.11.2026: Benutzername "msg-<sub>", JWT nur als Passwort - Mosquitto
                 // loggt Benutzernamen (fuer CrowdSec), Passwoerter nie.
-                username = "msg-" + (leseJwt(zugang.token)?.sub ?: k.userId),
+                // Eigenes Handy: msg-<sub>-z<zugang> (nennt der message-store), damit der Broker einen
+                // widerrufenen Zugang getrennt von den anderen Geraeten der Person abweisen kann.
+                username = zugang.benutzername ?: ("msg-" + (leseJwt(zugang.token)?.sub ?: k.userId)),
                 password = zugang.token,
                 keepAliveSek = KEEPALIVE_S,
                 will = MqttCodec.Will(RosenwegTopics.presence(k.userId), bauePresence(false).toByteArray(), 1, true),

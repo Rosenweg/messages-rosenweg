@@ -18,7 +18,8 @@ import java.io.File
 import java.security.KeyStore
 
 /**
- * Abmelden auf dem geteilten Telefon: der Messenger loescht sich SELBST (statt
+ * Abmelden (auch auf dem eigenen Handy: RosenwegPrivatAnmeldung.abmelden/Widerruf ruft allesLoeschen).
+ * Auf dem geteilten Telefon: der Messenger loescht sich SELBST (statt
  * clearApplicationUserData durch Rosenweg Gerät). So bleiben die per adb erteilten
  * Notfall-Rechte erhalten (Full-Screen-Intent, exakte Wecker, "Nicht stören",
  * Akku-Ausnahme), und nichts der vorherigen Person bleibt zurueck.
@@ -107,7 +108,7 @@ object RosenwegAbmeldung {
         // 5. Schluessel im AndroidKeyStore (Geraeteschluessel, Verpackungsschluessel)
         try {
             val ks = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
-            ks.aliases().toList().filter { it.startsWith("rw_dm_") }.forEach { ks.deleteEntry(it) }
+            ks.aliases().toList().filter { it.startsWith("rw_dm_") || it == RosenwegPrivatAnmeldung.ALIAS }.forEach { ks.deleteEntry(it) }
         } catch (e: Exception) {
             Log.w(TAG, "Keystore", e)
         }

@@ -16,13 +16,14 @@ class RosenwegApi(private val konto: RosenwegKonto) {
 
     class HttpFehler(val code: Int, msg: String, val serverText: String? = null) : IOException(msg)
 
-    data class MqttZugang(val token: String, val expiresInSek: Long, val angaben: JwtAngaben?)
+    /** benutzername: vom message-store genannter Broker-Name (msg-<uid>, eigenes Handy msg-<uid>-z<mz>) */
+    data class MqttZugang(val token: String, val expiresInSek: Long, val angaben: JwtAngaben?, val benutzername: String? = null)
 
     fun mqttToken(deviceId: String): MqttZugang {
         val antwort = anfrage("POST", "/api/token", buildJsonObject { put("deviceId", deviceId) }.toString())
         val o = parseJson(antwort) as? JsonObject ?: throw IOException("token: keine JSON-Antwort")
         val token = o.str("token") ?: throw IOException("token: fehlt")
-        return MqttZugang(token, o.lng("expiresIn") ?: 3600L, leseJwt(token))
+        return MqttZugang(token, o.lng("expiresIn") ?: 3600L, leseJwt(token), o.str("mqttUsername")?.takeIf { it.startsWith("msg-") })
     }
 
     fun gespraeche(): List<RwGespraechDaten> = parseGespraeche(anfrage("GET", "/api/conversations"))
