@@ -71,6 +71,7 @@ import org.fossify.messages.models.Events
 import org.fossify.messages.models.Message
 import org.fossify.messages.models.SearchResult
 import org.fossify.messages.rosenweg.MessengerVerbindung
+import org.fossify.messages.rosenweg.RosenwegPrivatAnmeldung
 import org.fossify.messages.rosenweg.RosenwegSmsModus
 import org.fossify.messages.rosenweg.isRosenwegThread
 import org.greenrobot.eventbus.EventBus
@@ -122,6 +123,8 @@ class MainActivity : SimpleActivity() {
         if (!MessengerVerbindung.istAktiv()) {
             MessengerVerbindung.starteWennKonto(this)
         }
+        // eigenes Handy: zurueck von der Anmeldung mit dem Rosenweg-Konto -> Zugang einrichten
+        richteEinWennAusstehend()
         // z.B. zurueck aus "Standard-Apps": andere SMS-App gewaehlt -> ab jetzt nur Messenger
         val neuerModus = RosenwegSmsModus.modus(this)
         if (neuerModus != smsModus) {
@@ -199,6 +202,8 @@ class MainActivity : SimpleActivity() {
             when (menuItem.itemId) {
                 R.id.rw_neuer_chat -> org.fossify.messages.rosenweg.RosenwegNeuerChat.zeige(this)
                 R.id.rw_standard_sms -> zeigeUebergangHinweis(erzwingen = true)
+                R.id.rw_anmelden -> RosenwegPrivatAnmeldung.starten(this)
+                R.id.rw_abmelden -> frageAbmelden()
                 R.id.show_recycle_bin -> launchRecycleBin()
                 R.id.show_archived -> launchArchivedConversations()
                 R.id.settings -> launchSettings()
@@ -216,6 +221,10 @@ class MainActivity : SimpleActivity() {
             // privat: Papierkorb gibt es nur fuer SMS (Rosenweg-Chats werden sofort geloescht)
             findItem(R.id.show_recycle_bin).isVisible = config.useRecycleBin && !nurMessenger
             findItem(R.id.rw_standard_sms).isVisible = smsModus == RosenwegSmsModus.Modus.PRIVAT_UEBERGANG
+            // eigenes Handy: selbst anmelden / abmelden (geteilte Telefone: ueber Rosenweg Geraet)
+            val privat = smsModus != RosenwegSmsModus.Modus.GETEILT
+            findItem(R.id.rw_anmelden).isVisible = privat && !RosenwegPrivatAnmeldung.angemeldet(this@MainActivity)
+            findItem(R.id.rw_abmelden).isVisible = privat && RosenwegPrivatAnmeldung.angemeldet(this@MainActivity)
             findItem(R.id.show_archived).isVisible = config.isArchiveAvailable
         }
     }
@@ -559,13 +568,15 @@ class MainActivity : SimpleActivity() {
         binding.noConversationsPlaceholder.beVisibleIf(show)
         if (nurMessenger) {
             val angemeldet = rosenwegAngemeldet()
-            binding.noConversationsPlaceholder.text = if (angemeldet) {
-                "Noch keine Rosenweg-Chats"
-            } else {
-                "Der Rosenweg Messenger ist auf diesem Telefon nicht angemeldet."
+            val einrichten = RosenwegPrivatAnmeldung.richtetGeradeEin()
+            binding.noConversationsPlaceholder.text = when {
+                angemeldet -> "Noch keine Rosenweg-Chats"
+                einrichten -> "Rosenweg Messenger wird eingerichtet …"
+                else -> "Melde dich mit deinem Rosenweg-Konto an, dann siehst du hier deine Rosenweg-Chats."
             }
-            binding.noConversationsPlaceholder2.text = "Neuen Rosenweg-Chat beginnen"
-            binding.noConversationsPlaceholder2.beVisibleIf(show && angemeldet)
+            // nicht angemeldet: der Knopf unter dem Text meldet an (launchNewConversation)
+            binding.noConversationsPlaceholder2.text = if (angemeldet) "Neuen Rosenweg-Chat beginnen" else "Mit Rosenweg-Konto anmelden"
+            binding.noConversationsPlaceholder2.beVisibleIf(show && !einrichten)
             binding.conversationsFab.beVisibleIf(angemeldet)
             return
         }
@@ -573,8 +584,53 @@ class MainActivity : SimpleActivity() {
         binding.noConversationsPlaceholder2.beVisibleIf(show)
     }
 
-    private fun rosenwegAngemeldet() = MessengerVerbindung.istAktiv() ||
-        org.fossify.messages.rosenweg.RosenwegKonto.eigeneIdGespeichert(this) != null
+    private fun rosenwegAngemeldet() = if (smsModus != RosenwegSmsModus.Modus.GETEILT) {
+        RosenwegPrivatAnmeldung.angemeldet(this)
+    } else {
+        MessengerVerbindung.istAktiv() || org.fossify.messages.rosenweg.RosenwegKonto.eigeneIdGespeichert(this) != null
+    }
+
+    /** Eigenes Handy: nach der Anmeldung im Browser den Messenger-Zugang einrichten. */
+    private fun richteEinWennAusstehend() {
+        if (smsModus == RosenwegSmsModus.Modus.GETEILT || !RosenwegPrivatAnmeldung.ausstehend(this) ||
+            RosenwegPrivatAnmeldung.richtetGeradeEin()
+        ) return
+        ensureBackgroundThread {
+            runOnUiThread { if (nurMessenger) showOrHidePlaceholder(true) }
+            val meldung = RosenwegPrivatAnmeldung.einrichtenWennAusstehend(applicationContext)
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                meldung?.let { toast(it, android.widget.Toast.LENGTH_LONG) }
+                refreshMenuItems()
+                if (nurMessenger) zeigeNurRosenwegChats()
+                if (RosenwegPrivatAnmeldung.angemeldet(this)) MessengerVerbindung.starteWennKonto(this)
+            }
+        }
+    }
+
+    /** Eigenes Handy: abmelden = Zugang an der Website loeschen und alle Rosenweg-Chats hier loeschen. */
+    private fun frageAbmelden() {
+        val wer = RosenwegPrivatAnmeldung.name(this)?.let { " ($it)" } ?: ""
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("Vom Rosenweg Messenger abmelden?")
+            .setMessage(
+                "Dein Rosenweg-Konto$wer wird auf diesem Handy abgemeldet. Die Rosenweg-Chats " +
+                    "auf diesem Handy werden gelöscht; auf deinen anderen Geräten und im Portal bleiben sie. " +
+                    "Neu anmelden geht jederzeit."
+            )
+            .setPositiveButton("Abmelden") { _, _ ->
+                ensureBackgroundThread {
+                    RosenwegPrivatAnmeldung.abmelden(applicationContext)
+                    runOnUiThread {
+                        if (isFinishing || isDestroyed) return@runOnUiThread
+                        toast("Abgemeldet")
+                        recreate()
+                    }
+                }
+            }
+            .setNegativeButton("Abbrechen", null)
+            .show()
+    }
 
     private fun fadeOutSearch() {
         binding.searchHolder.animate()
@@ -607,7 +663,7 @@ class MainActivity : SimpleActivity() {
             if (rosenwegAngemeldet()) {
                 org.fossify.messages.rosenweg.RosenwegNeuerChat.zeige(this)
             } else {
-                toast("Rosenweg Messenger ist nicht angemeldet")
+                RosenwegPrivatAnmeldung.starten(this)
             }
             return
         }

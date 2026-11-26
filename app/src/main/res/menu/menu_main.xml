@@ -19,6 +19,21 @@
         android:visible="false"
         app:showAsAction="never"
         tools:ignore="HardcodedText" />
+    <!-- eigenes Handy (kein Rosenweg Geraet): selbst mit dem Rosenweg-Konto an-/abmelden -->
+    <item
+        android:id="@+id/rw_anmelden"
+        android:showAsAction="never"
+        android:title="Mit Rosenweg-Konto anmelden"
+        android:visible="false"
+        app:showAsAction="never"
+        tools:ignore="HardcodedText" />
+    <item
+        android:id="@+id/rw_abmelden"
+        android:showAsAction="never"
+        android:title="Vom Rosenweg Messenger abmelden"
+        android:visible="false"
+        app:showAsAction="never"
+        tools:ignore="HardcodedText" />
     <item
         android:id="@+id/show_recycle_bin"
         android:showAsAction="never"

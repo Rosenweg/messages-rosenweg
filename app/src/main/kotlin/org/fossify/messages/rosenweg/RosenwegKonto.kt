@@ -7,9 +7,11 @@ import android.util.Log
 import java.util.UUID
 
 /**
- * Messenger-Zugang auf geteilten Rosenweg-Telefonen: kommt von der Geraete-App
- * (AnlageProvider.call("messenger_konto")). Leeres Bundle / Fehler = kein Zugang
- * (privates Handy oder niemand angemeldet) → Rosenweg-Teil bleibt inaktiv.
+ * Messenger-Zugang.
+ * - Geteiltes Rosenweg-Telefon: kommt von der Geraete-App (AnlageProvider.call("messenger_konto")).
+ *   Leeres Bundle / Fehler = niemand angemeldet → Rosenweg-Teil bleibt inaktiv.
+ * - Privates Handy (kein Rosenweg Geraet): eigener Zugang dieses Handys an der Website
+ *   ([RosenwegPrivatAnmeldung], "Mit Rosenweg-Konto anmelden"). Ohne Anmeldung kein Zugang.
  */
 data class RosenwegKonto(
     val server: String,
@@ -19,18 +21,21 @@ data class RosenwegKonto(
     val userId: String,
     /** Anzeigename aus dem Anlage-Token (Claim "name") */
     val name: String? = null,
+    /** so lange vor Ablauf neu holen (privat: kurze Tokens, darum weniger Vorlauf) */
+    val erneuernVorMs: Long = ERNEUERN_VOR_MS,
 ) {
     /** wie requireAuth im message-store: technik / präsident verwalten alle Gespraeche */
     val istAdmin: Boolean
         get() = leseJwt(token)?.groups?.any { it.lowercase() in setOf("technik", "präsident", "praesident") } == true
 
-    fun laeuftBaldAb(jetzt: Long = System.currentTimeMillis()) = gueltigBisMs - jetzt < ERNEUERN_VOR_MS
+    fun laeuftBaldAb(jetzt: Long = System.currentTimeMillis()) = gueltigBisMs - jetzt < erneuernVorMs
 
     companion object {
         private const val TAG = "RosenwegKonto"
         private val ANLAGE_URI: Uri = Uri.parse("content://ch.rosenweg4303.telefon.anlage")
         private const val METHODE = "messenger_konto"
         const val ERNEUERN_VOR_MS = 30 * 60 * 1000L
+        const val ERNEUERN_VOR_PRIVAT_MS = 10 * 60 * 1000L
 
         private const val PREFS = "rosenweg_messenger"
         private const val PREF_GERAET = "device_id"
@@ -43,7 +48,36 @@ data class RosenwegKonto(
             check(Looper.myLooper() != Looper.getMainLooper()) { "RosenwegKonto.hole() nicht auf dem UI-Thread" }
             val alt = zwischenspeicher
             if (!erzwingen && alt != null && !alt.laeuftBaldAb()) return alt
-            val neu = try {
+            val neu = if (RosenwegPrivatAnmeldung.privat(context)) holePrivat(context, alt) else holeVonGeraet(context)
+            zwischenspeicher = neu
+            return neu
+        }
+
+        /** Privates Handy: Messenger-Token mit dem eigenen Zugang an der Website. */
+        private fun holePrivat(context: Context, alt: RosenwegKonto?): RosenwegKonto? = try {
+            RosenwegPrivatAnmeldung.messengerToken(context)?.let { t ->
+                val jwt = leseJwt(t.token)
+                val sub = jwt?.sub
+                if (sub.isNullOrEmpty()) {
+                    null
+                } else {
+                    RosenwegKonto(t.server, t.token, (if (t.gueltigBisSek > 0) t.gueltigBisSek else (jwt.exp ?: 0L)) * 1000, sub, jwt.name, ERNEUERN_VOR_PRIVAT_MS)
+                }
+            }
+        } catch (e: RosenwegPrivatAnmeldung.Widerrufen) {
+            // Im Portal / von der Technik abgemeldet: abmelden und Daten loeschen - in einem eigenen
+            // Thread, weil hole() oft im Arbeits-Thread des Dienstes laeuft, den das Loeschen beendet.
+            Log.i(TAG, "eigener Zugang widerrufen - melde ab")
+            Thread { RosenwegPrivatAnmeldung.vomServerAbgemeldet(context.applicationContext) }.start()
+            null
+        } catch (e: Exception) {
+            // Website nicht erreichbar: mit dem bisherigen Token weiter, solange es gilt
+            Log.i(TAG, "kein Messenger-Token (Netz?)", e)
+            alt?.takeIf { it.gueltigBisMs > System.currentTimeMillis() + 60_000 }
+        }
+
+        private fun holeVonGeraet(context: Context): RosenwegKonto? {
+            return try {
                 val b = context.contentResolver.call(ANLAGE_URI, METHODE, context.packageName, null)
                 val server = b?.getString("server")?.trimEnd('/')
                 val token = b?.getString("token")
@@ -61,8 +95,6 @@ data class RosenwegKonto(
                 Log.i(TAG, "kein Messenger-Zugang", e)
                 null
             }
-            zwischenspeicher = neu
-            return neu
         }
 
         fun vergiss() {
