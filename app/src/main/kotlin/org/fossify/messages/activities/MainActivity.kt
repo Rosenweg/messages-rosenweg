@@ -124,8 +124,9 @@ class MainActivity : SimpleActivity() {
         if (!MessengerVerbindung.istAktiv()) {
             MessengerVerbindung.starteWennKonto(this)
         }
-        // eigenes Handy, nur Messenger, nicht angemeldet: gemeinsamer Anmeldeschirm (commons-rosenweg)
-        if (nurMessenger && RosenwegPrivatAnmeldung.schirmNoetig(this)) {
+        // eigenes Handy (immer nur Messenger), nicht angemeldet: gemeinsamer Anmeldeschirm
+        // (commons-rosenweg) - ohne Anmeldung ist die App nicht nutzbar, "Zurueck" schliesst sie
+        if (RosenwegPrivatAnmeldung.schirmNoetig(this)) {
             RosenwegPrivatAnmeldung.starten(this)
             return
         }
@@ -227,7 +228,8 @@ class MainActivity : SimpleActivity() {
                 org.fossify.messages.rosenweg.RosenwegKonto.eigeneIdGespeichert(this@MainActivity) != null
             // privat: Papierkorb gibt es nur fuer SMS (Rosenweg-Chats werden sofort geloescht)
             findItem(R.id.show_recycle_bin).isVisible = config.useRecycleBin && !nurMessenger
-            findItem(R.id.rw_standard_sms).isVisible = smsModus == RosenwegSmsModus.Modus.PRIVAT_UEBERGANG
+            // privat, aber noch Standard-SMS-App (aeltere Version): Weg zu "Standard-Apps"
+            findItem(R.id.rw_standard_sms).isVisible = nurMessenger && RosenwegSmsModus.istStandardSmsApp(this@MainActivity)
             // eigenes Handy: selbst anmelden / abmelden (geteilte Telefone: ueber Rosenweg Geraet)
             val privat = smsModus != RosenwegSmsModus.Modus.GETEILT
             findItem(R.id.rw_anmelden).isVisible = privat && !RosenwegPrivatAnmeldung.angemeldet(this@MainActivity)
@@ -260,10 +262,10 @@ class MainActivity : SimpleActivity() {
         when (smsModus) {
             RosenwegSmsModus.Modus.PRIVAT -> {
                 // privat: keine SMS-Rolle, keine SMS-Berechtigungen - nur Benachrichtigungen
+                if (RosenwegSmsModus.istStandardSmsApp(this)) zeigeUebergangHinweis()
                 starteNurMessenger()
                 return
             }
-            RosenwegSmsModus.Modus.PRIVAT_UEBERGANG -> zeigeUebergangHinweis()
             RosenwegSmsModus.Modus.GETEILT -> {}
         }
         if (isQPlus()) {
@@ -356,12 +358,12 @@ class MainActivity : SimpleActivity() {
             .setMessage(
                 "Auf privaten Telefonen ist der Rosenweg Messenger nur noch für Rosenweg-Chats da, " +
                     "nicht mehr für SMS.\n\n" +
-                    "Im Moment ist er noch deine Standard-SMS-App. Das kann nur Android umstellen: " +
-                    "Tippe auf „Standard-Apps öffnen“, dann auf „SMS-App“, und wähle deine gewohnte " +
-                    "SMS-App (z. B. Google Messages).\n\n" +
+                    "Im Moment ist er noch deine Standard-SMS-App, nimmt aber keine SMS mehr an. Damit " +
+                    "du weiter SMS bekommst, stelle jetzt um – das kann nur Android: Tippe auf " +
+                    "„Standard-Apps öffnen“, dann auf „SMS-App“, und wähle deine gewohnte SMS-App " +
+                    "(z. B. Google Messages).\n\n" +
                     "Deine SMS bleiben erhalten – sie liegen im SMS-Speicher von Android und sind " +
-                    "danach in der gewählten App zu sehen. Bis du umstellst, empfängt der Rosenweg " +
-                    "Messenger SMS weiter, damit keine verloren geht."
+                    "danach in der gewählten App zu sehen."
             )
             .setPositiveButton("Standard-Apps öffnen") { _, _ -> oeffneStandardApps() }
             .setNegativeButton("Später", null)

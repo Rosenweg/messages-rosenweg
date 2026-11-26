@@ -110,11 +110,11 @@ object RosenwegPrivatAnmeldung {
     }
 
     /**
-     * Beim Oeffnen der App (nur Messenger, eigenes Handy): ohne Anmeldung gleich den Schirm zeigen,
-     * wie die anderen Rosenweg-Apps. Nicht waehrend der Einrichtung und nicht nach einer Ablehnung
-     * (dafuer gibt es den eigenen Hinweis).
+     * Beim Oeffnen der App (eigenes Handy, Stefan 26.11.2026: immer): ohne gueltige Anmeldung gleich
+     * den Schirm zeigen, wie die anderen Rosenweg-Apps - auch nach einer Ablehnung (401/403).
+     * Nicht waehrend der Einrichtung (Anmeldung fertig, Messenger-Zugang wird eben geholt).
      */
-    fun schirmNoetig(c: Context) = privat(c) && !hatZugang(c) && !ausstehend(c) && !richtetEin
+    fun schirmNoetig(c: Context) = privat(c) && !angemeldet(c) && !ausstehend(c) && !richtetEin
 
     /** Zurueck aus dem Browser, aber noch kein Messenger-Zugang? */
     fun ausstehend(c: Context) = privat(c) && !angemeldet(c) && RosenwegAnmeldung.angemeldet(c)
