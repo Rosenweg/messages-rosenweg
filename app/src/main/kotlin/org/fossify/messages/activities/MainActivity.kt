@@ -71,6 +71,7 @@ import org.fossify.messages.models.Events
 import org.fossify.messages.models.Message
 import org.fossify.messages.models.SearchResult
 import org.fossify.messages.rosenweg.MessengerVerbindung
+import org.fossify.messages.rosenweg.RosenwegSmsModus
 import org.fossify.messages.rosenweg.isRosenwegThread
 import org.greenrobot.eventbus.EventBus
 import org.greenrobot.eventbus.Subscribe
@@ -80,6 +81,11 @@ class MainActivity : SimpleActivity() {
     override var isSearchBarEnabled = true
     
     private val MAKE_DEFAULT_APP_REQUEST = 1
+
+    // Rosenweg: privat (ohne Rosenweg Geraet) nur Messenger, keine SMS (RosenwegSmsModus)
+    private var smsModus = RosenwegSmsModus.Modus.GETEILT
+    private val nurMessenger get() = smsModus == RosenwegSmsModus.Modus.PRIVAT
+    private var uebergangHinweisGezeigt = false
 
     private var storedTextColor = 0
     private var storedFontSize = 0
@@ -98,7 +104,9 @@ class MainActivity : SimpleActivity() {
 
         setupEdgeToEdge(padBottomImeAndSystem = listOf(binding.conversationsList))
 
-        checkAndDeleteOldRecycleBinMessages()
+        smsModus = RosenwegSmsModus.abgleichen(this)
+        // Papierkorb leeren loescht SMS im Android-Speicher -> privat nie
+        if (!nurMessenger) checkAndDeleteOldRecycleBinMessages()
         clearAllMessagesIfNeeded {
             loadMessages()
         }
@@ -113,6 +121,12 @@ class MainActivity : SimpleActivity() {
         // Rosenweg Messenger: Verbindung starten, falls die Geraete-App einen Zugang liefert
         if (!MessengerVerbindung.istAktiv()) {
             MessengerVerbindung.starteWennKonto(this)
+        }
+        // z.B. zurueck aus "Standard-Apps": andere SMS-App gewaehlt -> ab jetzt nur Messenger
+        val neuerModus = RosenwegSmsModus.modus(this)
+        if (neuerModus != smsModus) {
+            smsModus = RosenwegSmsModus.abgleichen(this)
+            if (nurMessenger) initMessenger()
         }
         updateMenuColors()
         refreshMenuItems()
@@ -184,6 +198,7 @@ class MainActivity : SimpleActivity() {
         binding.mainMenu.requireToolbar().setOnMenuItemClickListener { menuItem ->
             when (menuItem.itemId) {
                 R.id.rw_neuer_chat -> org.fossify.messages.rosenweg.RosenwegNeuerChat.zeige(this)
+                R.id.rw_standard_sms -> zeigeUebergangHinweis(erzwingen = true)
                 R.id.show_recycle_bin -> launchRecycleBin()
                 R.id.show_archived -> launchArchivedConversations()
                 R.id.settings -> launchSettings()
@@ -198,7 +213,9 @@ class MainActivity : SimpleActivity() {
         binding.mainMenu.requireToolbar().menu.apply {
             findItem(R.id.rw_neuer_chat).isVisible = MessengerVerbindung.istAktiv() ||
                 org.fossify.messages.rosenweg.RosenwegKonto.eigeneIdGespeichert(this@MainActivity) != null
-            findItem(R.id.show_recycle_bin).isVisible = config.useRecycleBin
+            // privat: Papierkorb gibt es nur fuer SMS (Rosenweg-Chats werden sofort geloescht)
+            findItem(R.id.show_recycle_bin).isVisible = config.useRecycleBin && !nurMessenger
+            findItem(R.id.rw_standard_sms).isVisible = smsModus == RosenwegSmsModus.Modus.PRIVAT_UEBERGANG
             findItem(R.id.show_archived).isVisible = config.isArchiveAvailable
         }
     }
@@ -224,6 +241,15 @@ class MainActivity : SimpleActivity() {
     }
 
     private fun loadMessages() {
+        when (smsModus) {
+            RosenwegSmsModus.Modus.PRIVAT -> {
+                // privat: keine SMS-Rolle, keine SMS-Berechtigungen - nur Benachrichtigungen
+                starteNurMessenger()
+                return
+            }
+            RosenwegSmsModus.Modus.PRIVAT_UEBERGANG -> zeigeUebergangHinweis()
+            RosenwegSmsModus.Modus.GETEILT -> {}
+        }
         if (isQPlus()) {
             val roleManager = getSystemService(RoleManager::class.java)
             if (roleManager!!.isRoleAvailable(RoleManager.ROLE_SMS)) {
@@ -282,16 +308,92 @@ class MainActivity : SimpleActivity() {
         }
     }
 
+    private fun starteNurMessenger() {
+        handleNotificationPermission { granted ->
+            if (!granted) {
+                PermissionRequiredDialog(
+                    activity = this,
+                    textId = org.fossify.commons.R.string.allow_notifications_incoming_messages,
+                    positiveActionCallback = { openNotificationSettings() })
+            }
+        }
+        initMessenger()
+        if (bus == null) {
+            bus = EventBus.getDefault()
+            try {
+                bus!!.register(this)
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    /**
+     * Privates Telefon, aber diese App ist (aus einer frueheren Version) noch Standard-SMS-App.
+     * Android laesst eine App die Rolle nicht selbst abgeben; die Person waehlt ihre SMS-App unter
+     * "Standard-Apps". Bis dahin bleibt SMS an, damit keine SMS verloren geht.
+     */
+    private fun zeigeUebergangHinweis(erzwingen: Boolean = false) {
+        if ((uebergangHinweisGezeigt && !erzwingen) || isFinishing) return
+        uebergangHinweisGezeigt = true
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("Gewohnte SMS-App wieder einstellen")
+            .setMessage(
+                "Auf privaten Telefonen ist der Rosenweg Messenger nur noch für Rosenweg-Chats da, " +
+                    "nicht mehr für SMS.\n\n" +
+                    "Im Moment ist er noch deine Standard-SMS-App. Das kann nur Android umstellen: " +
+                    "Tippe auf „Standard-Apps öffnen“, dann auf „SMS-App“, und wähle deine gewohnte " +
+                    "SMS-App (z. B. Google Messages).\n\n" +
+                    "Deine SMS bleiben erhalten – sie liegen im SMS-Speicher von Android und sind " +
+                    "danach in der gewählten App zu sehen. Bis du umstellst, empfängt der Rosenweg " +
+                    "Messenger SMS weiter, damit keine verloren geht."
+            )
+            .setPositiveButton("Standard-Apps öffnen") { _, _ -> oeffneStandardApps() }
+            .setNegativeButton("Später", null)
+            .show()
+    }
+
+    private fun oeffneStandardApps() {
+        val versuche = listOf(
+            Intent(android.provider.Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS),
+            Intent(android.provider.Settings.ACTION_SETTINGS),
+        )
+        for (i in versuche) {
+            try {
+                startActivity(i)
+                return
+            } catch (_: Exception) {
+            }
+        }
+        toast("Bitte in den Einstellungen unter Apps › Standard-Apps › SMS-App umstellen")
+    }
+
     private fun initMessenger() {
         checkWhatsNewDialog()
         storeStateVariables()
-        getCachedConversations()
+        if (nurMessenger) {
+            zeigeNurRosenwegChats()
+        } else {
+            getCachedConversations()
+        }
         binding.noConversationsPlaceholder2.setOnClickListener {
             launchNewConversation()
         }
 
         binding.conversationsFab.setOnClickListener {
             launchNewConversation()
+        }
+    }
+
+    /** privat: nur die Rosenweg-Chats (negative Thread-IDs) aus der eigenen DB, nie der SMS-Speicher */
+    private fun zeigeNurRosenwegChats() {
+        ensureBackgroundThread {
+            val conversations = try {
+                conversationsDB.getNonArchived().filter { it.threadId.isRosenwegThread() }
+                    .toMutableList() as ArrayList<Conversation>
+            } catch (_: Exception) {
+                ArrayList()
+            }
+            runOnUiThread { setupConversations(conversations) }
         }
     }
 
@@ -420,7 +522,7 @@ class MainActivity : SimpleActivity() {
                 }.thenByDescending { it.date }
             ).toMutableList() as ArrayList<Conversation>
 
-        if (cached && config.appRunCount == 1) {
+        if (cached && config.appRunCount == 1 && !nurMessenger) {
             // there are no cached conversations on the first run so we show the
             // loading placeholder and progress until we are done loading from telephony
             showOrHideProgress(conversations.isEmpty())
@@ -455,9 +557,24 @@ class MainActivity : SimpleActivity() {
     private fun showOrHidePlaceholder(show: Boolean) {
         binding.conversationsFastscroller.beGoneIf(show)
         binding.noConversationsPlaceholder.beVisibleIf(show)
+        if (nurMessenger) {
+            val angemeldet = rosenwegAngemeldet()
+            binding.noConversationsPlaceholder.text = if (angemeldet) {
+                "Noch keine Rosenweg-Chats"
+            } else {
+                "Der Rosenweg Messenger ist auf diesem Telefon nicht angemeldet."
+            }
+            binding.noConversationsPlaceholder2.text = "Neuen Rosenweg-Chat beginnen"
+            binding.noConversationsPlaceholder2.beVisibleIf(show && angemeldet)
+            binding.conversationsFab.beVisibleIf(angemeldet)
+            return
+        }
         binding.noConversationsPlaceholder.text = getString(R.string.no_conversations_found)
         binding.noConversationsPlaceholder2.beVisibleIf(show)
     }
+
+    private fun rosenwegAngemeldet() = MessengerVerbindung.istAktiv() ||
+        org.fossify.messages.rosenweg.RosenwegKonto.eigeneIdGespeichert(this) != null
 
     private fun fadeOutSearch() {
         binding.searchHolder.animate()
@@ -485,6 +602,15 @@ class MainActivity : SimpleActivity() {
 
     private fun launchNewConversation() {
         hideKeyboard()
+        // privat: neuer Chat = Rosenweg-Chat (die SMS-Kontaktauswahl ist dort aus)
+        if (nurMessenger) {
+            if (rosenwegAngemeldet()) {
+                org.fossify.messages.rosenweg.RosenwegNeuerChat.zeige(this)
+            } else {
+                toast("Rosenweg Messenger ist nicht angemeldet")
+            }
+            return
+        }
         Intent(this, NewConversationActivity::class.java).apply {
             startActivity(this)
         }
@@ -492,6 +618,15 @@ class MainActivity : SimpleActivity() {
 
     @SuppressLint("NewApi")
     private fun checkShortcut() {
+        if (nurMessenger) {
+            // Verknuepfung "Neue Unterhaltung" fuehrt zur SMS-Kontaktauswahl (privat aus)
+            try {
+                getSystemService(ShortcutManager::class.java)?.removeAllDynamicShortcuts()
+            } catch (_: Exception) {
+            }
+            config.lastHandledShortcutColor = -1
+            return
+        }
         val appIconColor = config.appIconColor
         if (config.lastHandledShortcutColor != appIconColor) {
             val newConversation = getCreateNewContactShortcut(appIconColor)
@@ -538,8 +673,13 @@ class MainActivity : SimpleActivity() {
         if (text.length >= 2) {
             ensureBackgroundThread {
                 val searchQuery = "%$text%"
-                val messages = messagesDB.getMessagesWithText(searchQuery)
-                val conversations = conversationsDB.getConversationsWithText(searchQuery)
+                var messages = messagesDB.getMessagesWithText(searchQuery)
+                var conversations = conversationsDB.getConversationsWithText(searchQuery)
+                if (nurMessenger) {
+                    // privat: SMS aus frueheren Versionen im Zwischenspeicher nicht zeigen
+                    messages = messages.filter { it.threadId.isRosenwegThread() }
+                    conversations = conversations.filter { it.threadId.isRosenwegThread() }
+                }
                 if (text == lastSearchedText) {
                     showSearchResults(messages, conversations, text)
                 }

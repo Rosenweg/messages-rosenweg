@@ -23,6 +23,7 @@ import org.fossify.messages.helpers.THREAD_ID
 import org.fossify.messages.helpers.THREAD_TITLE
 import org.fossify.messages.models.Conversation
 import org.fossify.messages.models.Events
+import org.fossify.messages.rosenweg.isRosenwegThread
 import org.greenrobot.eventbus.EventBus
 import org.greenrobot.eventbus.Subscribe
 import org.greenrobot.eventbus.ThreadMode
@@ -77,7 +78,10 @@ class ArchivedConversationsActivity : SimpleActivity() {
     private fun loadArchivedConversations() {
         ensureBackgroundThread {
             val conversations = try {
-                conversationsDB.getAllArchived().toMutableList() as ArrayList<Conversation>
+                val nurMessenger = org.fossify.messages.rosenweg.RosenwegSmsModus.nurMessenger(this)
+                conversationsDB.getAllArchived()
+                    .filter { !nurMessenger || it.threadId.isRosenwegThread() }
+                    .toMutableList() as ArrayList<Conversation>
             } catch (e: Exception) {
                 ArrayList()
             }

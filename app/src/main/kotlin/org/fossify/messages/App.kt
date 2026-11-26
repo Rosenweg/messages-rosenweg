@@ -11,12 +11,15 @@ import org.fossify.commons.helpers.PERMISSION_READ_CONTACTS
 import org.fossify.commons.helpers.ensureBackgroundThread
 import org.fossify.messages.extensions.rescheduleAllScheduledMessages
 import org.fossify.messages.helpers.MessagingCache
+import org.fossify.messages.rosenweg.RosenwegSmsModus
 
 class App : FossifyApp() {
     override val isAppLockFeatureAvailable = true
 
     override fun onCreate() {
         super.onCreate()
+        // Rosenweg: SMS/MMS nur auf geteilten Telefonen, privat nur Messenger (MQTT)
+        val smsModus = RosenwegSmsModus.abgleichen(this)
         if (hasPermission(PERMISSION_READ_CONTACTS)) {
             listOf(
                 ContactsContract.Contacts.CONTENT_URI,
@@ -30,8 +33,10 @@ class App : FossifyApp() {
             }
         }
 
-        ensureBackgroundThread {
-            rescheduleAllScheduledMessages()
+        if (smsModus != RosenwegSmsModus.Modus.PRIVAT) {
+            ensureBackgroundThread {
+                rescheduleAllScheduledMessages()
+            }
         }
     }
 

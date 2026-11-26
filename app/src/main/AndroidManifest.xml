@@ -258,6 +258,18 @@
             </intent-filter>
         </receiver>
 
+        <!-- SMS/MMS nur auf geteilten Telefonen (mit Rosenweg Geraet). Auf privaten Telefonen schaltet
+             RosenwegSmsModus die SMS/MMS-Bausteine unten zur Laufzeit aus; dieser Empfaenger bleibt an. -->
+        <receiver
+            android:name=".rosenweg.RosenwegSmsModusReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.provider.action.DEFAULT_SMS_PACKAGE_CHANGED" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
         <receiver android:name=".receivers.SmsStatusSentReceiver" />
 
         <receiver android:name=".receivers.SmsStatusDeliveredReceiver" />

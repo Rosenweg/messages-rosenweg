@@ -1,6 +1,10 @@
 # Rosenweg Messenger
 
-SMS-App und Rosenweg-Messenger in einem, für die Smartphones der Siedlung Rosenweg in Kaiseraugst. Neben SMS/MMS zeigt die App die Gruppen, Kanäle und Direktnachrichten des Rosenweg-Messengers (wie in der Web-App). Der Rosenweg-Teil ist auf den geteilten Telefonen aktiv: den Zugang der angemeldeten Person liefert Rosenweg Gerät; ohne Rosenweg Gerät bleibt die App eine normale SMS-App.
+Rosenweg-Messenger für die Smartphones der Siedlung Rosenweg in Kaiseraugst: Gruppen, Kanäle und Direktnachrichten des Rosenweg-Messengers (wie in der Web-App), auf den geteilten Telefonen zusätzlich SMS/MMS.
+
+- **Geteilte Rosenweg-Telefone** (mit Rosenweg Gerät): SMS-App und Rosenweg-Messenger in einem. Die App ist Standard-SMS-App; den Messenger-Zugang der angemeldeten Person liefert Rosenweg Gerät.
+- **Private Telefone** (ohne Rosenweg Gerät): nur Rosenweg-Messenger über MQTT. Die App bindet sich nicht in SMS/MMS von Android ein: sie fragt weder die Rolle „Standard-SMS-App“ noch SMS-Berechtigungen an, ihre SMS/MMS-Bausteine sind ausgeschaltet (sie erscheint nicht in der Auswahl der SMS-Apps), sie zeigt keine SMS und meldet keine SMS. SMS bleiben in der gewohnten SMS-App.
+- **Übergang:** War die App auf einem privaten Telefon (frühere Version) Standard-SMS-App, bleibt SMS an, bis man unter *Einstellungen › Apps › Standard-Apps › SMS-App* die gewohnte App wählt (eine App kann diese Rolle nicht selbst abgeben); die App weist beim Start darauf hin. Es wird keine SMS gelöscht.
 
 ## Im Rosenweg
 
