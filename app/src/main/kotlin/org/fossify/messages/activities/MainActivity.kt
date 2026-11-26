@@ -85,6 +85,7 @@ class MainActivity : SimpleActivity() {
 
     // Rosenweg: privat (ohne Rosenweg Geraet) nur Messenger, keine SMS (RosenwegSmsModus)
     private var smsModus = RosenwegSmsModus.Modus.GETEILT
+    private var abgelehntGezeigt = false
     private val nurMessenger get() = smsModus == RosenwegSmsModus.Modus.PRIVAT
     private var uebergangHinweisGezeigt = false
 
@@ -125,6 +126,7 @@ class MainActivity : SimpleActivity() {
         }
         // eigenes Handy: zurueck von der Anmeldung mit dem Rosenweg-Konto -> Zugang einrichten
         richteEinWennAusstehend()
+        zeigeAbgelehntHinweis()
         // z.B. zurueck aus "Standard-Apps": andere SMS-App gewaehlt -> ab jetzt nur Messenger
         val neuerModus = RosenwegSmsModus.modus(this)
         if (neuerModus != smsModus) {
@@ -224,7 +226,7 @@ class MainActivity : SimpleActivity() {
             // eigenes Handy: selbst anmelden / abmelden (geteilte Telefone: ueber Rosenweg Geraet)
             val privat = smsModus != RosenwegSmsModus.Modus.GETEILT
             findItem(R.id.rw_anmelden).isVisible = privat && !RosenwegPrivatAnmeldung.angemeldet(this@MainActivity)
-            findItem(R.id.rw_abmelden).isVisible = privat && RosenwegPrivatAnmeldung.angemeldet(this@MainActivity)
+            findItem(R.id.rw_abmelden).isVisible = privat && RosenwegPrivatAnmeldung.hatZugang(this@MainActivity)
             findItem(R.id.show_archived).isVisible = config.isArchiveAvailable
         }
     }
@@ -606,6 +608,26 @@ class MainActivity : SimpleActivity() {
                 if (RosenwegPrivatAnmeldung.angemeldet(this)) MessengerVerbindung.starteWennKonto(this)
             }
         }
+    }
+
+    /**
+     * Eigenes Handy, Anmeldung abgelehnt (401/403): der Messenger fragt nicht mehr nach. Einmal je
+     * Bildschirm sagen, warum, und neu anmelden anbieten (die Chats bleiben).
+     */
+    private fun zeigeAbgelehntHinweis() {
+        if (abgelehntGezeigt || isFinishing || smsModus == RosenwegSmsModus.Modus.GETEILT ||
+            !RosenwegPrivatAnmeldung.abgelehnt(this) || RosenwegPrivatAnmeldung.ausstehend(this)
+        ) return
+        abgelehntGezeigt = true
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("Bitte neu anmelden")
+            .setMessage(
+                "Der Rosenweg hat die Anmeldung des Messengers abgelehnt. Er empfängt und sendet darum " +
+                    "nichts mehr. Melde dich neu an – deine Rosenweg-Chats bleiben erhalten."
+            )
+            .setPositiveButton("Mit Rosenweg-Konto anmelden") { _, _ -> RosenwegPrivatAnmeldung.starten(this) }
+            .setNegativeButton("Später", null)
+            .show()
     }
 
     /** Eigenes Handy: abmelden = Zugang an der Website loeschen und alle Rosenweg-Chats hier loeschen. */

@@ -43,6 +43,11 @@ data class RosenwegKonto(
         @Volatile
         private var zwischenspeicher: RosenwegKonto? = null
 
+        /** Art des letzten Fehlers beim Token-Holen (fuer das Zurueckhalten im Dienst) */
+        @Volatile
+        var letzterFehler = RwZurueckhalten.Art.NETZ
+            private set
+
         /** Holt den Zugang (blockierend, nie auf dem UI-Thread aufrufen). */
         fun hole(context: Context, erzwingen: Boolean = false): RosenwegKonto? {
             check(Looper.myLooper() != Looper.getMainLooper()) { "RosenwegKonto.hole() nicht auf dem UI-Thread" }
@@ -55,6 +60,9 @@ data class RosenwegKonto(
 
         /** Privates Handy: Messenger-Token mit dem eigenen Zugang an der Website. */
         private fun holePrivat(context: Context, alt: RosenwegKonto?): RosenwegKonto? = try {
+            // nach Serverfehlern auch hier die Wartezeit einhalten (Aufrufe aus der Oberflaeche)
+            val zurueck = RwZurueckhalten.fuer(context)
+            if (zurueck.wartetNachServerfehler()) throw RosenwegApi.HttpFehler(0, "Wartezeit nach Serverfehler")
             RosenwegPrivatAnmeldung.messengerToken(context)?.let { t ->
                 val jwt = leseJwt(t.token)
                 val sub = jwt?.sub
@@ -64,6 +72,12 @@ data class RosenwegKonto(
                     RosenwegKonto(t.server, t.token, (if (t.gueltigBisSek > 0) t.gueltigBisSek else (jwt.exp ?: 0L)) * 1000, sub, jwt.name, ERNEUERN_VOR_PRIVAT_MS)
                 }
             }
+        } catch (e: RosenwegPrivatAnmeldung.Abgelehnt) {
+            // 403 (z.B. Adresse gesperrt): sofort aufhoeren, Daten behalten, Anmeldeknopf zeigen
+            Log.w(TAG, "Website lehnt ab (403) - angehalten")
+            RosenwegPrivatAnmeldung.markiereAbgelehnt(context)
+            letzterFehler = RwZurueckhalten.Art.SERVER
+            null
         } catch (e: RosenwegPrivatAnmeldung.Widerrufen) {
             // Im Portal / von der Technik abgemeldet: abmelden und Daten loeschen - in einem eigenen
             // Thread, weil hole() oft im Arbeits-Thread des Dienstes laeuft, den das Loeschen beendet.
@@ -73,6 +87,7 @@ data class RosenwegKonto(
         } catch (e: Exception) {
             // Website nicht erreichbar: mit dem bisherigen Token weiter, solange es gilt
             Log.i(TAG, "kein Messenger-Token (Netz?)", e)
+            letzterFehler = if (e is RosenwegApi.HttpFehler) RwZurueckhalten.Art.SERVER else RwZurueckhalten.Art.NETZ
             alt?.takeIf { it.gueltigBisMs > System.currentTimeMillis() + 60_000 }
         }
 
