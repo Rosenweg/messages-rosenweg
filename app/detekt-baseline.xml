@@ -249,7 +249,7 @@
     <ID>MaxLineLength:ImageCompressor.kt$ImageCompressor$fun</ID>
     <ID>MaxLineLength:ImageCompressor.kt$ImageCompressor$private</ID>
     <ID>MaxLineLength:ImageCompressor.kt$ImageCompressor$var imageFile = File(outputDirectory, System.currentTimeMillis().toString().plus(mimeType.getExtensionFromMimeType()))</ID>
-    <ID>MaxLineLength:MainActivity.kt$MainActivity$binding.noConversationsPlaceholder2.text = if (angemeldet) "Neuen Rosenweg-Chat beginnen" else "Mit Rosenweg-Konto anmelden"</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$findItem(R.id.rw_standard_sms).isVisible = nurMessenger &amp;&amp; RosenwegSmsModus.istStandardSmsApp(this@MainActivity)</ID>
     <ID>MaxLineLength:MessagesDatabase.kt$MessagesDatabase.Companion.&lt;no name provided&gt;$"INSERT OR IGNORE INTO conversations_new (thread_id, snippet, date, read, title, photo_uri, is_group_conversation, phone_number) "</ID>
     <ID>MaxLineLength:MessagesDatabase.kt$MessagesDatabase.Companion.&lt;no name provided&gt;$"SELECT thread_id, snippet, date, read, title, photo_uri, is_group_conversation, phone_number FROM conversations"</ID>
     <ID>MaxLineLength:MessagesDatabase.kt$MessagesDatabase.Companion.&lt;no name provided&gt;$execSQL("CREATE TABLE IF NOT EXISTS `attachments` (`id` INTEGER PRIMARY KEY AUTOINCREMENT, `message_id` INTEGER NOT NULL, `uri_string` TEXT NOT NULL, `mimetype` TEXT NOT NULL, `width` INTEGER NOT NULL, `height` INTEGER NOT NULL, `filename` TEXT NOT NULL)")</ID>
@@ -361,7 +361,6 @@
     <ID>MaxLineLength:RosenwegProtokollTest.kt$RosenwegProtokollTest$val d = parseLiveNachricht("dm/dm-1/msg/3", """{"clientMsgId":"c","ts":1,"ciphertext":{"v":1,"alg":"ecdh-p256-aesgcm-v1"}}""")!!</ID>
     <ID>MaxLineLength:RosenwegProtokollTest.kt$RosenwegProtokollTest$val mitLogo = parseGespraeche("""{"conversations":[{"id":"technik","kind":"group","title":"Technik","topic_prefix":"group/technik","metadata":{"avatar":"data:image/png;base64,AA=="}}]}""")</ID>
     <ID>MaxLineLength:RosenwegSmsModus.kt$RosenwegSmsModus$if (geaendert &gt; 0) Log.i(TAG, "Modus $m: $geaendert SMS-Bausteine ${if (soll == PackageManager.COMPONENT_ENABLED_STATE_DISABLED) "aus" else "an"}")</ID>
-    <ID>MaxLineLength:RosenwegSmsModusTest.kt$RosenwegSmsModusTest$assertEquals(RosenwegSmsModus.Modus.PRIVAT_UEBERGANG, RosenwegSmsModus.modusAus(geraetDa = false, standardSmsApp = true))</ID>
     <ID>MaxLineLength:RosenwegSmsModusTest.kt$RosenwegSmsModusTest$halter.forEach { assertTrue("$it haelt SMS-Rolle, ist aber nicht in SMS_BAUSTEINE", it in RosenwegSmsModus.SMS_BAUSTEINE) }</ID>
     <ID>MaxLineLength:RosenwegSmsModusTest.kt$RosenwegSmsModusTest$val f = listOf("src/main/AndroidManifest.xml", "app/src/main/AndroidManifest.xml").map(::File).first { it.exists() }</ID>
     <ID>MaxLineLength:RosenwegSpeicher.kt$RosenwegSpeicher$(text?.let { parseJson(it) } as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }?.toSet() ?: emptySet()</ID>
