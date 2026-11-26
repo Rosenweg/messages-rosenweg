@@ -153,7 +153,7 @@ object RosenwegPrivatAnmeldung {
         richtetEin = true
         try {
             val geraet = listOf(Build.MANUFACTURER, Build.MODEL).filter { it.isNotBlank() }.distinct().joinToString(" ")
-            val (status, j) = post("/api/messenger/zugang", JSONObject().put("geraet", geraet), accessToken)
+            val (status, j) = post("/api/messenger/zugang", JSONObject().put("geraet", geraet).put("geraet_kennung", GeraetKennung.von(app)), accessToken)
             if (status != 200) {
                 throw Fehler(j.optString("error").ifEmpty { if (status == 401) "Anmeldung abgelaufen, bitte nochmals" else "Rosenweg nicht erreichbar ($status)" })
             }
@@ -189,7 +189,9 @@ object RosenwegPrivatAnmeldung {
     fun messengerToken(c: Context): Token? {
         if (abgelehnt(c)) return null
         val (zugang, geheimnis) = zugangsdaten(c) ?: return null
-        val (status, j) = post("/api/messenger/zugang/token", JSONObject().put("zugang", zugang).put("geheimnis", geheimnis), null)
+        val (status, j) = post("/api/messenger/zugang/token",
+            // geraet_kennung: aeltere Zugaenge bekommen sie so nachgetragen (eine Zeile je Handy im Portal)
+            JSONObject().put("zugang", zugang).put("geheimnis", geheimnis).put("geraet_kennung", GeraetKennung.von(c)), null)
         when (status) {
             200 -> {}
             401 -> throw Widerrufen()
