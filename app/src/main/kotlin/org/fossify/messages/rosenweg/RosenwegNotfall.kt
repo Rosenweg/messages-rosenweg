@@ -1,5 +1,6 @@
 package org.fossify.messages.rosenweg
 
+import android.annotation.SuppressLint
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -407,6 +408,8 @@ object RosenwegNotfall {
             }
         }
 
+        // alterFilter stammt aus currentInterruptionFilter, ist also ein gueltiger Filterwert.
+        @SuppressLint("WrongConstant")
         private fun leiseMachen(context: Context) {
             try {
                 val am = context.getSystemService(AudioManager::class.java)
