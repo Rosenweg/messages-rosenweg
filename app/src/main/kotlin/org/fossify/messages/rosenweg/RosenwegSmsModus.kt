@@ -22,12 +22,12 @@ import android.util.Log
  *   PackageManager ausgeschaltet (damit taucht die App auch nicht mehr in der Auswahl
  *   "Standard-SMS-App" auf), keine SMS-Benachrichtigungen, nur Rosenweg-Chats in der Liste.
  *
- * Uebergang: Ist die App auf einem privaten Telefon (aus einer frueheren Version) noch
- * Standard-SMS-App, bleiben die SMS-Bausteine an, bis die Person eine andere SMS-App waehlt.
- * Sonst gingen eingehende SMS verloren: Android liefert SMS nur an die Standard-SMS-App, und nur
- * sie schreibt sie in den SMS-Speicher. Eine App kann die Rolle nicht selbst abgeben
+ * Keinen Uebergang mehr (Stefan 26.11.2026): auf dem privaten Telefon gibt es nur noch den
+ * MQTT-Messenger, auch wenn die App (aus einer frueheren Version) noch Standard-SMS-App ist - die
+ * SMS-Bausteine sind dann trotzdem aus. Eine App kann die Rolle nicht selbst abgeben
  * (RoleManager.removeRoleHolder braucht MANAGE_ROLE_HOLDERS = nur System), deshalb zeigt
- * MainActivity einen Hinweis mit dem Weg zu "Standard-Apps". SMS werden nie geloescht.
+ * MainActivity in dem Fall einen Hinweis mit dem Weg zu "Standard-Apps", damit die Person eine
+ * andere SMS-App waehlt. SMS werden nie geloescht (sie liegen im SMS-Speicher von Android).
  */
 object RosenwegSmsModus {
     private const val TAG = "RosenwegSmsModus"
@@ -58,9 +58,6 @@ object RosenwegSmsModus {
         /** Rosenweg Geraet da: SMS + Rosenweg wie bisher */
         GETEILT,
 
-        /** privat, aber noch Standard-SMS-App (alte Version): SMS bleibt bis zum Wechsel */
-        PRIVAT_UEBERGANG,
-
         /** privat: nur Rosenweg Messenger (MQTT) */
         PRIVAT,
     }
@@ -84,19 +81,15 @@ object RosenwegSmsModus {
         false
     }
 
-    fun modus(c: Context): Modus = modusAus(geraetDa(c), istStandardSmsApp(c))
+    fun modus(c: Context): Modus = modusAus(geraetDa(c))
 
-    /** reine Entscheidung (fuer Tests) */
-    internal fun modusAus(geraetDa: Boolean, standardSmsApp: Boolean): Modus = when {
-        geraetDa -> Modus.GETEILT
-        standardSmsApp -> Modus.PRIVAT_UEBERGANG
-        else -> Modus.PRIVAT
-    }
+    /** reine Entscheidung (fuer Tests): privat immer nur Messenger, auch als Standard-SMS-App */
+    internal fun modusAus(geraetDa: Boolean): Modus = if (geraetDa) Modus.GETEILT else Modus.PRIVAT
 
     /** Nur Rosenweg-Chats (MQTT), keine SMS? */
     fun nurMessenger(c: Context): Boolean = modus(c) == Modus.PRIVAT
 
-    /** SMS-Bausteine eingeschaltet lassen? (geteilt oder Uebergang) */
+    /** SMS-Bausteine eingeschaltet lassen? (nur geteilt) */
     internal fun smsBausteineAn(m: Modus) = m != Modus.PRIVAT
 
     /**

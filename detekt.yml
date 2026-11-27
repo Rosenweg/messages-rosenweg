@@ -52,12 +52,10 @@ naming:
     ignoreAnnotated: ["Composable", "Preview"]
     functionPattern: "[a-z][A-Za-z0-9]*"
 
-Compose: # io.nlopez.compose.rules
-  ComposableParametersOrdering:
+Compose: # io.nlopez.compose.rules (Namen ab compose-rules 0.5/0.6)
+  ComposableParamOrder:
     active: true
-  ModifierDefaultValue:
+  ModifierWithoutDefault:
     active: true
-  MissingModifierDefaultValue:
-    active: true
-  PublicComposablePreview:
+  PreviewPublic:
     active: true
