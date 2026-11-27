@@ -5,6 +5,7 @@ import android.net.Uri
 import android.os.Looper
 import android.util.Log
 import java.util.UUID
+import org.fossify.commons.helpers.RosenwegGruppenFarbe
 
 /**
  * Messenger-Zugang.
@@ -55,6 +56,9 @@ data class RosenwegKonto(
             if (!erzwingen && alt != null && !alt.laeuftBaldAb()) return alt
             val neu = if (RosenwegPrivatAnmeldung.privat(context)) holePrivat(context, alt) else holeVonGeraet(context)
             zwischenspeicher = neu
+            // Gruppenfarbe nach der Person (Technik/Praesident gruen, Ausschuss/Verwaltung blau;
+            // commons RosenwegGruppenFarbe, nur bei Wechsel). Fehlt der Zugang wegen Netz, bleibt sie.
+            if (neu != null) RosenwegGruppenFarbe.setzen(context, leseJwt(neu.token)?.groups.orEmpty())
             return neu
         }
 
@@ -97,6 +101,8 @@ data class RosenwegKonto(
                 val server = b?.getString("server")?.trimEnd('/')
                 val token = b?.getString("token")
                 if (b == null || server.isNullOrEmpty() || token.isNullOrEmpty()) {
+                    // niemand am geteilten Telefon angemeldet: Standardfarbe
+                    if (b != null) RosenwegGruppenFarbe.abgemeldet(context)
                     null
                 } else {
                     @Suppress("DEPRECATION")

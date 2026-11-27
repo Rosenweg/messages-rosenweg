@@ -2,4 +2,7 @@
 <resources>
     <!-- Farbe des Anmeldeschirms wie der Logo-Grund (commons-rosenweg cloud ab 0.13.6): bewohner | verwaltung | technik -->
     <string name="rosenweg_gruppe" translatable="false">bewohner</string>
+    <!-- Gruppenfarbe nach der Person (commons RosenwegGruppenFarbe, Entscheid Stefan 28.11.2026):
+         Technik/Praesident verwalten alle Gespraeche (gruen), Ausschuss schreibt in Kanaelen (blau) -->
+    <string name="rosenweg_farb_gruppen" translatable="false">verwaltung,technik</string>
 </resources>

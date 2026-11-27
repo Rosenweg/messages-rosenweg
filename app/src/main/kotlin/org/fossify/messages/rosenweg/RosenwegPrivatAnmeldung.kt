@@ -14,6 +14,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import org.fossify.commons.helpers.RosenwegGruppenFarbe
 import org.json.JSONObject
 import java.io.IOException
 import java.security.KeyStore
@@ -236,6 +237,7 @@ object RosenwegPrivatAnmeldung {
     /** Zugang gibt es nicht mehr (401) oder Abmelden: alles loeschen, wieder "Mit Rosenweg-Konto anmelden". */
     fun vomServerAbgemeldet(c: Context) {
         val app = c.applicationContext
+        RosenwegGruppenFarbe.abgemeldet(app) // zurueck auf rot (Startsymbol, Akzent)
         prefs(app).edit().clear().commit()
         RosenwegAnmeldung.abmelden(app)
         RosenwegAbmeldung.allesLoeschen(app)
