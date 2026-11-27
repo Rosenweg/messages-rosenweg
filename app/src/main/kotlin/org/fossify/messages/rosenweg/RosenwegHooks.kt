@@ -290,6 +290,8 @@ class RosenwegAnmeldungReceiver : BroadcastReceiver() {
         val app = context.applicationContext
         ensureBackgroundThread {
             try {
+                // Meldung der Geraete-App: SMS-Modus gleich mit abgleichen (Rosenweg Geraet ist ja da)
+                RosenwegSmsModus.abgleichen(app)
                 MessengerVerbindung.starteWennKonto(app)
             } finally {
                 ende.finish()

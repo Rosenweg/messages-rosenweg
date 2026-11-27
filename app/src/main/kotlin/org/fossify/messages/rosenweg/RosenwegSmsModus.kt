@@ -1,5 +1,9 @@
 package org.fossify.messages.rosenweg
 
+import android.app.AlarmManager
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.role.RoleManager
 import android.content.BroadcastReceiver
 import android.content.ComponentName
@@ -7,8 +11,12 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.SystemClock
+import android.provider.Settings
 import android.provider.Telephony
 import android.util.Log
+import androidx.core.app.NotificationCompat
+import org.fossify.messages.R
 
 /**
  * SMS/MMS nur auf geteilten Rosenweg-Telefonen (Stefan 26.11.2026).
@@ -27,11 +35,34 @@ import android.util.Log
  * SMS-Bausteine sind dann trotzdem aus. Eine App kann die Rolle nicht selbst abgeben
  * (RoleManager.removeRoleHolder braucht MANAGE_ROLE_HOLDERS = nur System), deshalb zeigt
  * MainActivity in dem Fall einen Hinweis mit dem Weg zu "Standard-Apps", damit die Person eine
- * andere SMS-App waehlt. SMS werden nie geloescht (sie liegen im SMS-Speicher von Android).
+ * andere SMS-App waehlt (dazu eine Benachrichtigung, auch wenn die App nicht geoeffnet wird).
+ * SMS werden nie geloescht (sie liegen im SMS-Speicher von Android).
+ *
+ * Abgleich wie bei Rosenweg Telefon (Betriebsart): beim Prozessstart (App), nach Update/Neustart,
+ * beim Wechsel der Standard-SMS-App, bei Meldungen der Geraete-App (ANGEMELDET/ABGEMELDET) und
+ * alle 30 Min. (Wecker [WECKER]). Wird Rosenweg Geraet nachtraeglich installiert oder entfernt,
+ * stellt die App so spaetestens nach 30 Min. um.
  */
 object RosenwegSmsModus {
     private const val TAG = "RosenwegSmsModus"
     private const val ANLAGE = "ch.rosenweg4303.telefon.anlage"
+    private const val KANAL = "rosenweg_einrichtung"
+    private const val NOTIF_ROLLE = 4311
+
+    /** Aktion des 30-Minuten-Weckers (an RosenwegSmsModusReceiver). */
+    const val WECKER = "ch.rosenweg4303.messages.SMS_MODUS_PRUEFEN"
+    private const val WECKER_REQ = 4312
+
+    const val ROLLE_TITEL = "Gewohnte SMS-App wieder einstellen"
+    const val ROLLE_TEXT =
+        "Auf privaten Telefonen ist der Rosenweg Messenger nur noch für Rosenweg-Chats da, " +
+            "nicht mehr für SMS.\n\n" +
+            "Im Moment ist er noch deine Standard-SMS-App, nimmt aber keine SMS mehr an. Damit " +
+            "du weiter SMS bekommst, stelle jetzt um – das kann nur Android: Tippe auf " +
+            "„Standard-Apps öffnen“, dann auf „SMS-App“, und wähle deine gewohnte SMS-App " +
+            "(z. B. Google Messages).\n\n" +
+            "Deine SMS bleiben erhalten – sie liegen im SMS-Speicher von Android und sind " +
+            "danach in der gewählten App zu sehen."
 
     /**
      * SMS/MMS-Bausteine aus dem Manifest, die auf privaten Telefonen aus sind. Klassennamen im
@@ -117,13 +148,80 @@ object RosenwegSmsModus {
             }
         }
         if (geaendert > 0) Log.i(TAG, "Modus $m: $geaendert SMS-Bausteine ${if (soll == PackageManager.COMPONENT_ENABLED_STATE_DISABLED) "aus" else "an"}")
+        rolleHinweis(c, rolleHinweisNoetig(m, istStandardSmsApp(c)))
+        weckerStellen(c)
         return m
+    }
+
+    /** reine Entscheidung (fuer Tests): Hinweis nur privat und nur solange die Rolle noch bei uns ist */
+    internal fun rolleHinweisNoetig(m: Modus, standardSmsApp: Boolean) = m == Modus.PRIVAT && standardSmsApp
+
+    /** Einstellungen "Standard-Apps" (dort waehlt die Person wieder die SMS-App des Handys). */
+    val standardAppsEinstellung: Intent
+        get() = Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+    /**
+     * Benachrichtigung "Gewohnte SMS-App wieder einstellen" (Antippen -> Standard-Apps). Die Rolle
+     * entzieht die App nie selbst; die Benachrichtigung verschwindet beim naechsten Abgleich, sobald
+     * eine andere SMS-App gewaehlt ist (Android meldet den Wechsel an RosenwegSmsModusReceiver).
+     */
+    private fun rolleHinweis(c: Context, zeigen: Boolean) {
+        val nm = c.getSystemService(NotificationManager::class.java) ?: return
+        if (!zeigen) {
+            nm.cancel(NOTIF_ROLLE)
+            return
+        }
+        try {
+            if (nm.getNotificationChannel(KANAL) == null) {
+                nm.createNotificationChannel(
+                    NotificationChannel(KANAL, "Einrichtung", NotificationManager.IMPORTANCE_HIGH).apply {
+                        description = "Hinweise, wenn auf dem Handy etwas umzustellen ist"
+                    }
+                )
+            }
+            val pi = PendingIntent.getActivity(
+                c, NOTIF_ROLLE, standardAppsEinstellung,
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            )
+            val n = NotificationCompat.Builder(c, KANAL)
+                .setSmallIcon(R.drawable.ic_messenger)
+                .setContentTitle(ROLLE_TITEL)
+                .setContentText("Rosenweg Messenger ist noch Standard-SMS-App. Antippen und ändern.")
+                .setStyle(NotificationCompat.BigTextStyle().bigText(ROLLE_TEXT))
+                .setContentIntent(pi)
+                .addAction(0, "Standard-Apps öffnen", pi)
+                .setAutoCancel(true)
+                .setOnlyAlertOnce(true)
+                .build()
+            nm.notify(NOTIF_ROLLE, n)
+        } catch (e: SecurityException) {
+            Log.w(TAG, "Hinweis Standard-SMS-App: ${e.javaClass.simpleName}")
+        }
+    }
+
+    /** Alle 30 Min. abgleichen (ungenau, weckt das Handy nicht). Einmal gestellt bleibt er bis zum Neustart. */
+    private fun weckerStellen(c: Context) {
+        val i = Intent(c, RosenwegSmsModusReceiver::class.java).setAction(WECKER)
+        val flags = PendingIntent.FLAG_IMMUTABLE
+        if (PendingIntent.getBroadcast(c, WECKER_REQ, i, flags or PendingIntent.FLAG_NO_CREATE) != null) return
+        val am = c.getSystemService(AlarmManager::class.java) ?: return
+        try {
+            am.setInexactRepeating(
+                AlarmManager.ELAPSED_REALTIME,
+                SystemClock.elapsedRealtime() + AlarmManager.INTERVAL_HALF_HOUR,
+                AlarmManager.INTERVAL_HALF_HOUR,
+                PendingIntent.getBroadcast(c, WECKER_REQ, i, flags or PendingIntent.FLAG_UPDATE_CURRENT),
+            )
+        } catch (e: Exception) {
+            Log.w(TAG, "Wecker: ${e.javaClass.simpleName}")
+        }
     }
 }
 
 /**
- * Bleibt immer an: Neustart, Update und Wechsel der Standard-SMS-App (Android schickt
- * ACTION_DEFAULT_SMS_PACKAGE_CHANGED gezielt an die alte und die neue SMS-App) -> Bausteine abgleichen.
+ * Bleibt immer an: Neustart, Update, Wechsel der Standard-SMS-App (Android schickt
+ * ACTION_DEFAULT_SMS_PACKAGE_CHANGED gezielt an die alte und die neue SMS-App) und der
+ * 30-Minuten-Wecker -> Bausteine abgleichen.
  */
 class RosenwegSmsModusReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {

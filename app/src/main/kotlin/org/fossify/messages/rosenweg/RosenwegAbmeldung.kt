@@ -148,6 +148,7 @@ class RosenwegAbmeldungReceiver : BroadcastReceiver() {
         val app = context.applicationContext
         Thread {
             try {
+                RosenwegSmsModus.abgleichen(app)
                 RosenwegAbmeldung.allesLoeschen(app)
             } catch (e: Exception) {
                 Log.w("RosenwegAbmeldung", "Abmelden", e)
