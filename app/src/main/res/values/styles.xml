@@ -2,6 +2,15 @@
 
     <style name="AppTheme" parent="AppTheme.Base" />
 
+    <!-- Teilen -> Rosenweg-Chat: nur Dialoge ueber der teilenden App -->
+    <style name="RosenwegTeilenTheme" parent="AppTheme">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:backgroundDimEnabled">false</item>
+        <item name="windowNoTitle">true</item>
+        <item name="windowActionBar">false</item>
+    </style>
+
     <style name="roundedImageView" parent="">
         <item name="cornerFamily">rounded</item>
         <item name="cornerSize">@dimen/normal_margin</item>
