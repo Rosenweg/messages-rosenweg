@@ -39,6 +39,7 @@ class RosenwegTeilenActivity : AppCompatActivity() {
 
     private var warten: ProgressDialog? = null
 
+    @Suppress("TooGenericExceptionCaught")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val teile = TeilenInhalt.teile(this, intent)
@@ -108,7 +109,7 @@ class RosenwegTeilenActivity : AppCompatActivity() {
             .show()
     }
 
-    @Suppress("DEPRECATION")
+    @Suppress("DEPRECATION", "TooGenericExceptionCaught")
     private fun senden(ziel: Ziel, teile: List<Teil>, text: String) {
         warten = ProgressDialog.show(this, null, "Wird gesendet …", true, false)
         ensureBackgroundThread {
@@ -165,7 +166,7 @@ class RosenwegTeilenActivity : AppCompatActivity() {
     }
 
     private fun neueDm(p: RwUser): RwChat {
-        val konto = RosenwegKonto.hole(this) ?: throw IllegalStateException("nicht angemeldet")
+        val konto = checkNotNull(RosenwegKonto.hole(this)) { "nicht angemeldet" }
         val speicher = RosenwegSpeicher.get(this)
         val chat = speicher.nimmGespraechAuf(RosenwegApi(konto).neuesGespraech(p.id, null, emptyList()))
         MessengerVerbindung.neuVerbinden()
@@ -257,6 +258,10 @@ internal object TeilenInhalt {
 object RosenwegBild {
     const val MAX_SEITE = 2048
     private const val QUALITAET = 85
+    private const val GRAD_90 = 90
+    private const val GRAD_180 = 180
+    private const val GRAD_270 = 270
+    private const val TAG = "RosenwegBild"
 
     /** GIF (Animation) und SVG nicht anfassen. */
     fun verkleinern(mime: String): Boolean =
@@ -278,44 +283,56 @@ object RosenwegBild {
     }
 
     /** Verkleinerte JPEG-Kopie im Cache oder null (dann das Original senden). */
+    @Suppress("TooGenericExceptionCaught")
     fun verkleinere(c: android.content.Context, uri: Uri): File? = try {
-        val r = c.contentResolver
-        val masse = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        r.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, masse) }
-        if (masse.outWidth <= 0 || masse.outHeight <= 0) {
-            null
-        } else {
-            val opt = BitmapFactory.Options().apply { inSampleSize = teiler(masse.outWidth, masse.outHeight) }
-            val roh = r.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opt) }
-            roh?.let { b ->
-                val drehung = r.openInputStream(uri)?.use { drehung(ExifInterface(it)) } ?: 0
-                val (w, h) = ziel(b.width, b.height)
-                val m = Matrix().apply {
-                    postScale(w.toFloat() / b.width, h.toFloat() / b.height)
-                    if (drehung != 0) postRotate(drehung.toFloat())
-                }
-                val fertig = Bitmap.createBitmap(b, 0, 0, b.width, b.height, m, true)
-                val ordner = File(c.cacheDir, "rosenweg_teilen").apply { mkdirs() }
-                val f = File(ordner, "bild-${System.currentTimeMillis()}.jpg")
-                FileOutputStream(f).use { fertig.compress(Bitmap.CompressFormat.JPEG, QUALITAET, it) }
-                if (fertig !== b) fertig.recycle()
-                b.recycle()
-                f
-            }
-        }
+        lade(c, uri)?.let { b -> speichere(c, gedreht(b, drehung(c, uri))) }
     } catch (e: Exception) {
-        Log.w("RosenwegBild", "Verkleinern: ${e.javaClass.simpleName}")
+        // fremde Anbieter werfen alles Moegliche: dann das Original senden
+        Log.w(TAG, "Verkleinern: ${e.javaClass.simpleName}")
         null
     } catch (e: OutOfMemoryError) {
-        Log.w("RosenwegBild", "Verkleinern: zu gross")
+        Log.w(TAG, "Verkleinern: zu gross (${e.javaClass.simpleName})")
         null
     }
 
+    /** Bild mit passendem inSampleSize laden (spart Speicher bei grossen Fotos). */
+    private fun lade(c: android.content.Context, uri: Uri): Bitmap? {
+        val r = c.contentResolver
+        val masse = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        r.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, masse) }
+        if (masse.outWidth <= 0 || masse.outHeight <= 0) return null
+        val opt = BitmapFactory.Options().apply { inSampleSize = teiler(masse.outWidth, masse.outHeight) }
+        return r.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opt) }
+    }
+
+    /** Auf Zielgroesse bringen und nach EXIF drehen. */
+    private fun gedreht(b: Bitmap, grad: Int): Bitmap {
+        val (w, h) = ziel(b.width, b.height)
+        val m = Matrix().apply {
+            postScale(w.toFloat() / b.width, h.toFloat() / b.height)
+            if (grad != 0) postRotate(grad.toFloat())
+        }
+        val neu = Bitmap.createBitmap(b, 0, 0, b.width, b.height, m, true)
+        if (neu !== b) b.recycle()
+        return neu
+    }
+
+    private fun speichere(c: android.content.Context, b: Bitmap): File {
+        val ordner = File(c.cacheDir, "rosenweg_teilen").apply { mkdirs() }
+        val f = File(ordner, "bild-${System.currentTimeMillis()}.jpg")
+        FileOutputStream(f).use { b.compress(Bitmap.CompressFormat.JPEG, QUALITAET, it) }
+        b.recycle()
+        return f
+    }
+
+    private fun drehung(c: android.content.Context, uri: Uri): Int =
+        c.contentResolver.openInputStream(uri)?.use { drehung(ExifInterface(it)) } ?: 0
+
     private fun drehung(e: ExifInterface): Int =
         when (e.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)) {
-            ExifInterface.ORIENTATION_ROTATE_90 -> 90
-            ExifInterface.ORIENTATION_ROTATE_180 -> 180
-            ExifInterface.ORIENTATION_ROTATE_270 -> 270
+            ExifInterface.ORIENTATION_ROTATE_90 -> GRAD_90
+            ExifInterface.ORIENTATION_ROTATE_180 -> GRAD_180
+            ExifInterface.ORIENTATION_ROTATE_270 -> GRAD_270
             else -> 0
         }
 }
