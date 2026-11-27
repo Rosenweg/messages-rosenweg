@@ -93,6 +93,7 @@ import org.fossify.commons.helpers.ExportResult
 import org.fossify.commons.helpers.KEY_PHONE
 import org.fossify.commons.helpers.MyContactsContentProvider
 import org.fossify.commons.helpers.NavigationIcon
+import org.fossify.commons.helpers.PERMISSION_CAMERA
 import org.fossify.commons.helpers.PERMISSION_READ_PHONE_STATE
 import org.fossify.commons.helpers.SimpleContactsHelper
 import org.fossify.commons.helpers.VcfExporter
@@ -1636,6 +1637,15 @@ class ThreadActivity : SimpleActivity() {
         }
     }
 
+    // Rosenweg: commons-rosenweg cloud (ab 0.12.0) bringt CAMERA ins Manifest ("QR-Code scannen" im
+    // Anmeldeschirm). Ist das Recht deklariert, aber nicht erteilt, lehnt Android
+    // ACTION_IMAGE_CAPTURE/ACTION_VIDEO_CAPTURE mit einer SecurityException ab - also vorher fragen.
+    private fun mitKameraRecht(aktion: () -> Unit) {
+        handlePermission(PERMISSION_CAMERA) { erteilt ->
+            if (erteilt) aktion() else toast(org.fossify.commons.R.string.no_camera_permissions)
+        }
+    }
+
     private fun launchCapturePhotoIntent() {
         val imageFile = File.createTempFile("attachment_", ".jpg", getAttachmentsDir())
         capturedImageUri = getMyFileUri(imageFile)
@@ -2372,10 +2382,10 @@ class ThreadActivity : SimpleActivity() {
             launchGetContentIntent(arrayOf("video/*"), PICK_VIDEO_INTENT)
         }
         takePhoto.setOnClickListener {
-            launchCapturePhotoIntent()
+            mitKameraRecht { launchCapturePhotoIntent() }
         }
         recordVideo.setOnClickListener {
-            launchCaptureVideoIntent()
+            mitKameraRecht { launchCaptureVideoIntent() }
         }
         recordAudio.setOnClickListener {
             launchCaptureAudioIntent()
