@@ -142,10 +142,10 @@ detekt {
 
 dependencies {
     // Rosenweg Updater (ohne Geraet: alle Rosenweg-Apps aus dem Katalog der Anlage aktualisieren)
-    implementation("ch.rosenweg4303:updater:0.1.7")
+    implementation("ch.rosenweg4303:updater:0.1.8")
     // Rosenweg Cloud: gemeinsamer Anmeldeschirm (Karte oder Rosenweg-Konto) und RosenwegAnmeldung
     // fuer die Anmeldung auf dem eigenen Handy (RosenwegPrivatAnmeldung); bringt den Updater mit
-    implementation("ch.rosenweg4303:cloud:0.13.7")
+    implementation("ch.rosenweg4303:cloud:0.13.8")
     implementation(libs.fossify.commons)
     implementation(libs.eventbus)
     implementation(libs.indicator.fast.scroll)
