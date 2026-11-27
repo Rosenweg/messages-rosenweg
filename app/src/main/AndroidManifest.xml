@@ -179,6 +179,30 @@
             android:theme="@android:style/Theme.Material.NoActionBar.Fullscreen"
             android:turnScreenOn="true" />
 
+        <!-- Teilen -> Rosenweg-Chat (privat und geteilt): eigener Eingang, unabhaengig vom SMS-Weg
+             (NewConversationActivity, privat aus). Nicht in RosenwegSmsModus.SMS_BAUSTEINE. -->
+        <activity
+            android:name=".rosenweg.RosenwegTeilenActivity"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:label="@string/rw_teilen"
+            android:theme="@style/RosenwegTeilenTheme">
+
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+
+                <data android:mimeType="*/*" />
+            </intent-filter>
+
+            <intent-filter>
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+
+                <data android:mimeType="*/*" />
+            </intent-filter>
+        </activity>
+
         <activity
             android:name=".rosenweg.RosenwegGruppeActivity"
             android:configChanges="orientation"
