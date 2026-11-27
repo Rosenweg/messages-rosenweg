@@ -157,8 +157,8 @@ object RosenwegSmsModus {
     internal fun rolleHinweisNoetig(m: Modus, standardSmsApp: Boolean) = m == Modus.PRIVAT && standardSmsApp
 
     /** Einstellungen "Standard-Apps" (dort waehlt die Person wieder die SMS-App des Handys). */
-    fun standardAppsEinstellung(): Intent =
-        Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    val standardAppsEinstellung: Intent
+        get() = Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
     /**
      * Benachrichtigung "Gewohnte SMS-App wieder einstellen" (Antippen -> Standard-Apps). Die Rolle
@@ -180,7 +180,8 @@ object RosenwegSmsModus {
                 )
             }
             val pi = PendingIntent.getActivity(
-                c, NOTIF_ROLLE, standardAppsEinstellung(), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+                c, NOTIF_ROLLE, standardAppsEinstellung,
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
             )
             val n = NotificationCompat.Builder(c, KANAL)
                 .setSmallIcon(R.drawable.ic_messenger)

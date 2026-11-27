@@ -367,7 +367,7 @@ class MainActivity : SimpleActivity() {
 
     private fun oeffneStandardApps() {
         val versuche = listOf(
-            RosenwegSmsModus.standardAppsEinstellung(),
+            RosenwegSmsModus.standardAppsEinstellung,
             Intent(android.provider.Settings.ACTION_SETTINGS),
         )
         for (i in versuche) {
