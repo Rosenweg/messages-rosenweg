@@ -22,6 +22,15 @@ class RosenwegSmsModusTest {
         assertFalse(RosenwegSmsModus.smsBausteineAn(RosenwegSmsModus.Modus.PRIVAT))
     }
 
+    /** Hinweis "gewohnte SMS-App wieder einstellen" nur privat und nur, solange die Rolle bei uns ist. */
+    @Test
+    fun rolleHinweisNurPrivatMitRolle() {
+        assertTrue(RosenwegSmsModus.rolleHinweisNoetig(RosenwegSmsModus.Modus.PRIVAT, standardSmsApp = true))
+        assertFalse(RosenwegSmsModus.rolleHinweisNoetig(RosenwegSmsModus.Modus.PRIVAT, standardSmsApp = false))
+        assertFalse(RosenwegSmsModus.rolleHinweisNoetig(RosenwegSmsModus.Modus.GETEILT, standardSmsApp = true))
+        assertFalse(RosenwegSmsModus.rolleHinweisNoetig(RosenwegSmsModus.Modus.GETEILT, standardSmsApp = false))
+    }
+
     private val manifest: List<Element> by lazy {
         val f = listOf("src/main/AndroidManifest.xml", "app/src/main/AndroidManifest.xml").map(::File).first { it.exists() }
         val doc = DocumentBuilderFactory.newInstance().apply { isNamespaceAware = false }.newDocumentBuilder().parse(f)

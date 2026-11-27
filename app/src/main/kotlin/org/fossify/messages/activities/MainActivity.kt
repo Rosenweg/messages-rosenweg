@@ -133,12 +133,15 @@ class MainActivity : SimpleActivity() {
         // eigenes Handy: zurueck von der Anmeldung (Karte oder Rosenweg-Konto) -> Zugang einrichten
         richteEinWennAusstehend()
         zeigeAbgelehntHinweis()
-        // z.B. zurueck aus "Standard-Apps": andere SMS-App gewaehlt -> ab jetzt nur Messenger
-        val neuerModus = RosenwegSmsModus.modus(this)
-        if (neuerModus != smsModus) {
-            smsModus = RosenwegSmsModus.abgleichen(this)
-            if (nurMessenger) initMessenger()
+        // z.B. zurueck aus "Standard-Apps" (Hinweis weg) oder Rosenweg Geraet inzwischen da/weg
+        val vorher = smsModus
+        smsModus = RosenwegSmsModus.abgleichen(this)
+        if (smsModus != vorher && !nurMessenger) {
+            // privat -> geteilt (Rosenweg Geraet neu da): SMS-Weg (Rolle, Berechtigungen) neu aufbauen
+            recreate()
+            return
         }
+        if (smsModus != vorher) initMessenger()
         updateMenuColors()
         refreshMenuItems()
 
@@ -348,23 +351,15 @@ class MainActivity : SimpleActivity() {
     /**
      * Privates Telefon, aber diese App ist (aus einer frueheren Version) noch Standard-SMS-App.
      * Android laesst eine App die Rolle nicht selbst abgeben; die Person waehlt ihre SMS-App unter
-     * "Standard-Apps". Bis dahin bleibt SMS an, damit keine SMS verloren geht.
+     * "Standard-Apps". Die SMS-Bausteine sind trotzdem schon aus (RosenwegSmsModus), SMS nimmt
+     * diese App hier also nicht mehr an - darum der Hinweis (dazu eine Benachrichtigung).
      */
     private fun zeigeUebergangHinweis(erzwingen: Boolean = false) {
         if ((uebergangHinweisGezeigt && !erzwingen) || isFinishing) return
         uebergangHinweisGezeigt = true
         androidx.appcompat.app.AlertDialog.Builder(this)
-            .setTitle("Gewohnte SMS-App wieder einstellen")
-            .setMessage(
-                "Auf privaten Telefonen ist der Rosenweg Messenger nur noch für Rosenweg-Chats da, " +
-                    "nicht mehr für SMS.\n\n" +
-                    "Im Moment ist er noch deine Standard-SMS-App, nimmt aber keine SMS mehr an. Damit " +
-                    "du weiter SMS bekommst, stelle jetzt um – das kann nur Android: Tippe auf " +
-                    "„Standard-Apps öffnen“, dann auf „SMS-App“, und wähle deine gewohnte SMS-App " +
-                    "(z. B. Google Messages).\n\n" +
-                    "Deine SMS bleiben erhalten – sie liegen im SMS-Speicher von Android und sind " +
-                    "danach in der gewählten App zu sehen."
-            )
+            .setTitle(RosenwegSmsModus.ROLLE_TITEL)
+            .setMessage(RosenwegSmsModus.ROLLE_TEXT)
             .setPositiveButton("Standard-Apps öffnen") { _, _ -> oeffneStandardApps() }
             .setNegativeButton("Später", null)
             .show()
@@ -372,7 +367,7 @@ class MainActivity : SimpleActivity() {
 
     private fun oeffneStandardApps() {
         val versuche = listOf(
-            Intent(android.provider.Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS),
+            RosenwegSmsModus.standardAppsEinstellung(),
             Intent(android.provider.Settings.ACTION_SETTINGS),
         )
         for (i in versuche) {
