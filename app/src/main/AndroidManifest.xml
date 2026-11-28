@@ -440,12 +440,13 @@
             </intent-filter>
         </activity-alias>
 
+        <!-- Rosenweg: Startsymbol Gruppenfarbe verwaltung (commons RosenwegGruppenFarbe) -->
         <activity-alias
             android:name=".activities.SplashActivity.Blue"
             android:enabled="false"
             android:exported="true"
-            android:icon="@mipmap/ic_launcher"
-            android:roundIcon="@mipmap/ic_launcher"
+            android:icon="@mipmap/ic_launcher_verwaltung"
+            android:roundIcon="@mipmap/ic_launcher_verwaltung"
             android:targetActivity=".activities.SplashActivity">
 
             <intent-filter>
@@ -482,12 +483,13 @@
             </intent-filter>
         </activity-alias>
 
+        <!-- Rosenweg: Startsymbol Gruppenfarbe technik (commons RosenwegGruppenFarbe) -->
         <activity-alias
             android:name=".activities.SplashActivity.Teal"
             android:enabled="false"
             android:exported="true"
-            android:icon="@mipmap/ic_launcher"
-            android:roundIcon="@mipmap/ic_launcher"
+            android:icon="@mipmap/ic_launcher_technik"
+            android:roundIcon="@mipmap/ic_launcher_technik"
             android:targetActivity=".activities.SplashActivity">
 
             <intent-filter>
